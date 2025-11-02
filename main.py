@@ -14,10 +14,13 @@ PERIMETER_RADIUS = 25  # Těsně u koule (mezera 5px)
 CANNON_LENGTH = 15
 ROTATION_SPEED = 3  # stupně za frame
 LASER_DURATION = 0.1  # Jak dlouho laser svítí (sekundy)
+LASER_RECHARGE_TIME = 3.0  # Čas dobití děla po střelbě (sekundy)
+DAY_LENGTH = 30.0  # Délka dne v sekundách
+NIGHT_LENGTH = 30.0  # Délka noci v sekundách
 MINE_RADIUS = 6  # Poloměr miny (liché číslo pro přesný střed)
 MINE_CORE_RADIUS = 5  # Poloměr červeného středu (liché)
 BLINK_SPEED = 1  # Jak rychle bliká střed (cykly za sekundu)
-MAX_MINES = 30  # Maximální počet min na obrazovce
+MAX_MINES = 15  # Maximální počet min na obrazovce
 ENEMY_RADIUS = 15  # Poloměr nepřítele
 ENEMY_SPEED = 1  # Základní rychlost nepřítele (zpomaleno o 50%)
 ENEMY_SPAWN_TIME = 1  # Jak často se spawn nepřítel (sekundy)
@@ -488,6 +491,13 @@ class Game(arcade.Window):
         self.laser_end_y = 0
         self.debug_shot_count = 0  # Pro debug - počítadlo střel
         
+        # Systém dobití děla
+        self.laser_charge_time = LASER_RECHARGE_TIME  # Začíná plně nabitý (3.0s)
+        
+        # Systém dne a noci
+        self.is_day = True  # True = den, False = noc
+        self.day_night_timer = DAY_LENGTH  # Začínáme dnem, časovač odpočítává
+        
         # Miny - SpriteList s spatial hashing pro rychlejší kolize
         self.mine_list = arcade.SpriteList(use_spatial_hash=True)
         
@@ -510,6 +520,14 @@ class Game(arcade.Window):
         
     def on_draw(self):
         """Vykreslení na obrazovku"""
+        # Nastav barvu pozadí podle dne/noci
+        if self.is_day:
+            # Ve dne světlejší pozadí (tmavě šedé)
+            arcade.set_background_color((40, 40, 50))  # Tmavě šedé s nádechem modré
+        else:
+            # V noci tmavé pozadí (černé)
+            arcade.set_background_color(arcade.color.BLACK)
+        
         self.clear()
         
         # Vykresli miny
@@ -562,12 +580,99 @@ class Game(arcade.Window):
                 3
             )
         
+        # Vykresli progress bar pro dobití děla (nahoře na obrazovce)
+        self.draw_charge_bar()
+        
+        # Vykresli stav světla (nahoře napravo)
+        self.draw_light_status()
+        
         # Zobraz FPS v levém horním rohu (použij arcade.Text pro lepší výkon)
         if not hasattr(self, 'fps_text'):
             self.fps_text = arcade.Text("", 10, SCREEN_HEIGHT - 30, arcade.color.WHITE, 16)
         fps = arcade.get_fps()
         self.fps_text.text = f"FPS: {fps:.1f}"
         self.fps_text.draw()
+    
+    def draw_charge_bar(self):
+        """Vykreslí progress bar pro dobití světelného děla"""
+        # Pozice baru (uprostřed nahoře)
+        bar_x = SCREEN_WIDTH // 2
+        bar_y = SCREEN_HEIGHT - 40
+        bar_width = 300
+        bar_height = 20
+        bar_padding = 5  # Mezera mezi textem a barem
+        
+        # Vypočítej procento nabití (0.0 až 1.0)
+        charge_percentage = min(1.0, self.laser_charge_time / LASER_RECHARGE_TIME)
+        
+        # Text "Světelné dělo :"
+        text_label = "Světelné dělo :"
+        text_x = bar_x - bar_width // 2 - 120  # Text vlevo od baru
+        text_y = bar_y
+        
+        # Vykresli text
+        arcade.draw_text(
+            text_label,
+            text_x, text_y,
+            arcade.color.WHITE,
+            16,
+            anchor_x="left",
+            anchor_y="center"
+        )
+        
+        # Vykresli bílý nevyplněný obdélník (outline)
+        bar_left = bar_x - bar_width // 2
+        bar_bottom = bar_y - bar_height // 2
+        bar_top = bar_y + bar_height // 2
+        
+        # Vykresli obrys obdélníku pomocí draw_lbwh_rectangle_outline (left, bottom, width, height, color, border_width)
+        border_width = 2
+        arcade.draw_lbwh_rectangle_outline(
+            bar_left,          # left
+            bar_bottom,        # bottom
+            bar_width,         # width
+            bar_height,        # height
+            arcade.color.WHITE,
+            border_width       # border_width
+        )
+        
+        # Vykresli vyplněný obdélník podle procenta nabití (zleva doprava)
+        if charge_percentage > 0:
+            filled_width = bar_width * charge_percentage
+            filled_right = bar_left + filled_width  # Pravý okraj vyplněné části
+            
+            # Použij draw_lrbt_rectangle_filled (left, right, bottom, top, color)
+            arcade.draw_lrbt_rectangle_filled(
+                bar_left,          # left
+                filled_right,      # right
+                bar_bottom,        # bottom
+                bar_top,           # top
+                arcade.color.WHITE
+            )
+    
+    def draw_light_status(self):
+        """Vykreslí stav světla (Den/Noc) nahoře napravo na obrazovce"""
+        # Pozice textu (napravo nahoře)
+        text_x = SCREEN_WIDTH - 200
+        text_y = SCREEN_HEIGHT - 40
+        
+        # Text podle stavu
+        if self.is_day:
+            status_text = "Stav světla: Den"
+            text_color = arcade.color.YELLOW  # Žlutá pro den
+        else:
+            status_text = "Stav světla: Noc"
+            text_color = arcade.color.BLUE  # Modrá pro noc
+        
+        # Vykresli text
+        arcade.draw_text(
+            status_text,
+            text_x, text_y,
+            text_color,
+            16,
+            anchor_x="left",
+            anchor_y="center"
+        )
         
     def update_laser_position(self):
         """Vypočítá pozice laseru a kolize s nepřáteli"""
@@ -634,6 +739,28 @@ class Game(arcade.Window):
             
         # Normalizuj úhel (0-360)
         self.cannon_angle = self.cannon_angle % 360
+        
+        # Aktualizuj cyklus dne a noci
+        self.day_night_timer -= delta_time
+        if self.day_night_timer <= 0:
+            # Přepni den/noc
+            self.is_day = not self.is_day
+            if self.is_day:
+                self.day_night_timer = DAY_LENGTH
+            else:
+                self.day_night_timer = NIGHT_LENGTH
+                # V noci resetuj nabití děla na 0
+                self.laser_charge_time = 0
+        
+        # Aktualizuj dobití děla (pouze ve dne)
+        if self.is_day:
+            if self.laser_charge_time < LASER_RECHARGE_TIME:
+                self.laser_charge_time += delta_time
+                if self.laser_charge_time > LASER_RECHARGE_TIME:
+                    self.laser_charge_time = LASER_RECHARGE_TIME
+        else:
+            # V noci je dělo na 0%
+            self.laser_charge_time = 0
         
         # Odpočítávej časovač laseru
         if self.laser_active:
@@ -841,6 +968,13 @@ class Game(arcade.Window):
         
         # Reset laseru
         self.laser_active = False
+        
+        # Reset dobití děla (začíná plně nabitý)
+        self.laser_charge_time = LASER_RECHARGE_TIME
+        
+        # Reset systému dne a noci (začíná dnem)
+        self.is_day = True
+        self.day_night_timer = DAY_LENGTH
     
     def on_mouse_motion(self, x, y, dx, dy):
         """Pohyb myši"""
@@ -848,16 +982,25 @@ class Game(arcade.Window):
             self.player.center_x = x
             self.player.center_y = y
     
+    def can_fire_laser(self):
+        """Zkontroluje, zda je dělo plně nabité a může střílet (pouze ve dne)"""
+        return self.is_day and self.laser_charge_time >= LASER_RECHARGE_TIME
+    
     def on_mouse_press(self, x, y, button, modifiers):
         """Kliknutí myši"""
         if self.player.game_over:
             return
             
         if button == arcade.MOUSE_BUTTON_LEFT:
+            # Vystřel laser, ale jen pokud je dělo plně nabité
+            if not self.can_fire_laser():
+                return  # Dělo není nabité, nelze střílet
+                
             # Vystřel laser
             # DEBUG výpisy odstraněny kvůli výkonu
             self.laser_active = True
             self.laser_timer = LASER_DURATION
+            self.laser_charge_time = 0  # Resetuj dobití po střelbě
             self.debug_shot_count += 1  # Zvýš počítadlo střel
             # Vypočítej pozice laseru a kolize hned
             self.update_laser_position()
