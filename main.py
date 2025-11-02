@@ -17,6 +17,10 @@ LASER_DURATION = 0.1  # Jak dlouho laser svítí (sekundy)
 LASER_RECHARGE_TIME = 3.0  # Čas dobití děla po střelbě (sekundy)
 DAY_LENGTH = 30.0  # Délka dne v sekundách
 NIGHT_LENGTH = 30.0  # Délka noci v sekundách
+DAY_BACKGROUND_COLOR = (56,53,48)  # Barva pozadí ve dne (tmavě šedá jako IDE)
+NIGHT_BACKGROUND_COLOR = (0,0,0)  # Barva pozadí v noci (černá)
+DAY_ROBOT_COLOR = (255, 255, 0)  # Barva robota ve dni (zlatý)
+NIGHT_ROBOT_COLOR = (255, 255, 255)  # Barva robota v noci (bílý)
 MINE_RADIUS = 6  # Poloměr miny (liché číslo pro přesný střed)
 MINE_CORE_RADIUS = 5  # Poloměr červeného středu (liché)
 BLINK_SPEED = 1  # Jak rychle bliká střed (cykly za sekundu)
@@ -70,11 +74,9 @@ class Player(arcade.Sprite):
         """Aktualizuj barvu robota podle dne/noci (pokud není game over)"""
         if not self.game_over:
             if is_day:
-                # Ve dne: zlatý
-                color = (255, 215, 0)  # Zlatý
+                color = DAY_ROBOT_COLOR
             else:
-                # V noci: bílý
-                color = arcade.color.WHITE
+                color = NIGHT_ROBOT_COLOR
             
             new_texture = arcade.make_soft_circle_texture(
                 ROBOT_RADIUS * 2,
@@ -543,11 +545,9 @@ class Game(arcade.Window):
         """Vykreslení na obrazovku"""
         # Nastav barvu pozadí podle dne/noci
         if self.is_day:
-            # Ve dne tmavé pozadí (barva jako IDE Cursor)
-            arcade.set_background_color((30, 30, 30))  # Tmavě šedá jako IDE
+            arcade.set_background_color(DAY_BACKGROUND_COLOR)
         else:
-            # V noci tmavé pozadí (černé)
-            arcade.set_background_color(arcade.color.BLACK)
+            arcade.set_background_color(NIGHT_BACKGROUND_COLOR)
         
         self.clear()
         
@@ -569,9 +569,9 @@ class Game(arcade.Window):
         if not self.player.game_over:
             # Barva obrysu podle dne/noci (ve dne zlatý, v noci bílý)
             if self.is_day:
-                outline_color = (255, 215, 0)  # Zlatý
+                outline_color = DAY_ROBOT_COLOR
             else:
-                outline_color = arcade.color.WHITE
+                outline_color = NIGHT_ROBOT_COLOR
             arcade.draw_circle_outline(
                 self.player.center_x,
                 self.player.center_y,
@@ -591,9 +591,9 @@ class Game(arcade.Window):
             
             # Barva děla podle dne/noci (ve dne zlatý, v noci bílý)
             if self.is_day:
-                cannon_color = (255, 215, 0)  # Zlatý
+                cannon_color = DAY_ROBOT_COLOR
             else:
-                cannon_color = arcade.color.WHITE
+                cannon_color = NIGHT_ROBOT_COLOR
             arcade.draw_line(
                 cannon_start_x, cannon_start_y,
                 cannon_end_x, cannon_end_y,
@@ -605,9 +605,9 @@ class Game(arcade.Window):
         if self.laser_active and not self.player.game_over:
             # Barva laseru podle dne/noci (ve dne zlatý, v noci bílý)
             if self.is_day:
-                laser_color = (255, 215, 0)  # Zlatý
+                laser_color = DAY_ROBOT_COLOR
             else:
-                laser_color = arcade.color.WHITE
+                laser_color = NIGHT_ROBOT_COLOR
             arcade.draw_line(
                 self.laser_start_x, self.laser_start_y,
                 self.laser_end_x, self.laser_end_y,
@@ -701,10 +701,10 @@ class Game(arcade.Window):
         # Text a barva podle stavu
         if self.is_day:
             status_text = "Stav světla: Den"
-            text_color = (255, 215, 0)  # Zlatá pro den (na tmavém pozadí)
+            text_color = DAY_ROBOT_COLOR  # Zlatá pro den (na tmavém pozadí)
         else:
             status_text = "Stav světla: Noc"
-            text_color = arcade.color.WHITE  # Bílá pro noc (na černém pozadí)
+            text_color = NIGHT_ROBOT_COLOR  # Bílá pro noc (na černém pozadí)
         
         # Vykresli text
         arcade.draw_text(

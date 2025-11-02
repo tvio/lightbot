@@ -1,0 +1,16 @@
+zatahnout v noci delo
+Dalsi prisery - do vlastnich file
+Dasli priery napady - rizena prisera do miny, jinak do playera, had z vicero casti
+Textura podkladu pro den a noci
+Zmenit vizual bota
+Casovani dalsich priser po nejakem case
+skore
+yaml config
+Model obtiznosti
+Usvit a zapad - jiny cas, jine vlastnosti?
+Zbrane  - svetelna atomovka, vice kanonu, navadene miny
+Boss desing , level design mozna 
+Razna hudba
+Menu
+
+
