@@ -489,6 +489,9 @@ class Game(arcade.Window):
         # Schovej kurzor myši
         self.set_mouse_visible(False)
         
+        # Skóre
+        self.score = 0
+        
         # Hráč sprite
         self.player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         self.player_list = arcade.SpriteList(use_spatial_hash=False)  # Bez spatial hash (jen 1 sprite)
@@ -496,6 +499,10 @@ class Game(arcade.Window):
         
         # Úhel děla (0 = vpravo, 90 = nahoru)
         self.cannon_angle = 0
+        
+        # Animace zmizení děla v noci
+        self.cannon_fade_time = 2.0  # Čas na zmizení děla (2 sekundy)
+        self.cannon_fade_timer = 0.0  # Časovač pro animaci
         
         # Klávesy pro rotaci
         self.rotate_left = False
@@ -582,24 +589,35 @@ class Game(arcade.Window):
             
             # Vykresli dělo (tlustá čára) - barva podle dne/noci
             angle_rad = math.radians(self.cannon_angle)
-            cannon_end_x = self.player.center_x + (PERIMETER_RADIUS + CANNON_LENGTH) * math.cos(angle_rad)
-            cannon_end_y = self.player.center_y + (PERIMETER_RADIUS + CANNON_LENGTH) * math.sin(angle_rad)
             
             # Spočítej počáteční pozici děla (na obvodu kruhu)
             cannon_start_x = self.player.center_x + PERIMETER_RADIUS * math.cos(angle_rad)
             cannon_start_y = self.player.center_y + PERIMETER_RADIUS * math.sin(angle_rad)
             
-            # Barva děla podle dne/noci (ve dne zlatý, v noci bílý)
-            if self.is_day:
-                cannon_color = DAY_ROBOT_COLOR
-            else:
-                cannon_color = NIGHT_ROBOT_COLOR
-            arcade.draw_line(
-                cannon_start_x, cannon_start_y,
-                cannon_end_x, cannon_end_y,
-                cannon_color,
-                5
-            )
+            # Spočítej aktuální délku děla podle fade timeru
+            current_cannon_length = CANNON_LENGTH
+            if not self.is_day:
+                # Lineární interpolace délky od CANNON_LENGTH do 0 podle času
+                fade_progress = self.cannon_fade_timer / self.cannon_fade_time
+                current_cannon_length = CANNON_LENGTH * (1 - fade_progress)
+            
+            # Spočítej konečnou pozici děla s aktuální délkou
+            cannon_end_x = self.player.center_x + (PERIMETER_RADIUS + current_cannon_length) * math.cos(angle_rad)
+            cannon_end_y = self.player.center_y + (PERIMETER_RADIUS + current_cannon_length) * math.sin(angle_rad)
+            
+            # Vykresli dělo pouze pokud má nějakou délku
+            if current_cannon_length > 0:
+                # Barva děla podle dne/noci (ve dne zlatý, v noci bílý)
+                if self.is_day:
+                    cannon_color = DAY_ROBOT_COLOR
+                else:
+                    cannon_color = NIGHT_ROBOT_COLOR
+                arcade.draw_line(
+                    cannon_start_x, cannon_start_y,
+                    cannon_end_x, cannon_end_y,
+                    cannon_color,
+                    5
+                )
         
         # Vykresli laser, pokud je aktivní a není game over
         if self.laser_active and not self.player.game_over:
@@ -619,7 +637,7 @@ class Game(arcade.Window):
         self.draw_charge_bar()
         
         # Vykresli stav světla (nahoře napravo)
-        self.draw_light_status()
+        self.vykresli_skore()
         
         # Zobraz FPS v levém horním rohu (použij arcade.Text pro lepší výkon)
         if not hasattr(self, 'fps_text'):
@@ -692,23 +710,20 @@ class Game(arcade.Window):
                 bar_fill_color
             )
     
-    def draw_light_status(self):
-        """Vykreslí stav světla (Den/Noc) nahoře napravo na obrazovce"""
+    def vykresli_skore(self):
+        """Vykreslí skóre nahoře napravo na obrazovce"""
         # Pozice textu (napravo nahoře)
         text_x = SCREEN_WIDTH - 200
         text_y = SCREEN_HEIGHT - 40
         
-        # Text a barva podle stavu
-        if self.is_day:
-            status_text = "Stav světla: Den"
-            text_color = DAY_ROBOT_COLOR  # Zlatá pro den (na tmavém pozadí)
-        else:
-            status_text = "Stav světla: Noc"
-            text_color = NIGHT_ROBOT_COLOR  # Bílá pro noc (na černém pozadí)
+      
+        score_text = f"Skóre: {self.score}"
+        text_color = NIGHT_ROBOT_COLOR  
+    
         
         # Vykresli text
         arcade.draw_text(
-            status_text,
+            score_text,
             text_x, text_y,
             text_color,
             16,
@@ -750,8 +765,9 @@ class Game(arcade.Window):
             # Laser končí na nepřítele
             self.laser_end_x = collision_x
             self.laser_end_y = collision_y
-            # Znič nepřítele
+            # Znič nepřítele a přidej bod
             hit_enemy.start_explosion()
+            self.score += 1
         else:
             # Laser končí na okraji obrazovky
             self.laser_end_x = screen_end_x
@@ -799,6 +815,16 @@ class Game(arcade.Window):
         if previous_day_state != self.is_day or not hasattr(self, 'player_color_day'):
             self.player.update_color(self.is_day)
             self.player_color_day = self.is_day
+            
+            # Reset fade timeru při přechodu do noci
+            if not self.is_day:
+                self.cannon_fade_timer = 0.0
+        
+        # Aktualizuj animaci zmizení děla v noci
+        if not self.is_day and self.cannon_fade_timer < self.cannon_fade_time:
+            self.cannon_fade_timer += delta_time
+            if self.cannon_fade_timer > self.cannon_fade_time:
+                self.cannon_fade_timer = self.cannon_fade_time
         
         # Aktualizuj dobití děla (pouze ve dne)
         if self.is_day:
@@ -857,6 +883,7 @@ class Game(arcade.Window):
                 # Enemy narazil na minu
                 enemy.start_explosion()
                 enemies_to_remove.append(enemy)
+                self.score += 1  # Přidej bod za zničení nepřítele minou
                 
                 # Odstraň všechny miny, se kterými kolidoval
                 for mine in hit_mines:
@@ -999,6 +1026,9 @@ class Game(arcade.Window):
         self.player.explode_timer = 0
         # Nastav barvu robota podle dne/noci
         self.player.update_color(self.is_day)
+        
+        # Reset skóre
+        self.score = 0
         
         # Vymaž miny
         self.mine_list.clear()

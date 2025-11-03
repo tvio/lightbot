@@ -1,10 +1,8 @@
-zatahnout v noci delo
 Dalsi prisery - do vlastnich file
-Dasli priery napady - rizena prisera do miny, jinak do playera, had z vicero casti
+Dasli priery napady - rizena prisera do miny, jinak do playera, had z vicero casti. Prisare co udrzuje noc
 Textura podkladu pro den a noci
 Zmenit vizual bota
 Casovani dalsich priser po nejakem case
-skore
 yaml config
 Model obtiznosti
 Usvit a zapad - jiny cas, jine vlastnosti?
