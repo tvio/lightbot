@@ -1,0 +1,64 @@
+# LightBot - Game Configuration
+# Centrální konfigurace pro hru
+
+# Obrazovka
+screen:
+  width: 1600
+  height: 1000
+  title: "LightBot - Fáze 2"
+
+# Hráč (robot)
+player:
+  radius: 20
+  perimeter_radius: 25
+  color_day: [255, 255, 0] # Zlatý
+  color_night: [255, 255, 255] # Bílý
+
+# Cannon (dělo)
+cannon:
+  length: 15
+  rotation_speed: 3 # stupně za frame
+
+# Laser (světelné dělo)
+laser:
+  duration: 0.1 # Jak dlouho laser svítí (sekundy)
+  recharge_time: 3.0 # Čas dobití po střelbě
+
+# Den/Noc cyklus
+day_night:
+  day_length: 30.0
+  night_length: 30.0
+  day_background_color: [56, 53, 48]
+  night_background_color: [0, 0, 0]
+
+# Miny
+mines:
+  radius: 6
+  core_radius: 5
+  blink_speed: 1
+  max_count: 15
+
+# Nepřátelé - generální nastavení
+enemies:
+  spawn_time: 1 # Jak často se spawn (sekundy)
+  spawn_margin: 40 # Maximální vzdálenost od okraje
+
+# Konfigurace jednotlivých typů nepřátel
+enemies_config:
+  crab:
+    radius: 15
+    speed: 1
+    animation_path: "pict/crab-red.gif"
+    animation_frame_duration: 0.15
+    scale_multiplier: 2
+    movement_direction_change_time: [5, 12] # Náhodně 5-12 sekund
+    movement_type: "sideway" # "sideway" = chůze bokem
+
+  star:
+    radius: 12
+    speed: 1.5
+    animation_path: "pict/star-blue.gif"
+    animation_frame_duration: 0.1
+    scale_multiplier: 1.5
+    movement_direction_change_time: [3, 8] # Hvězda se otáčí rychleji
+    movement_type: "direct" # "direct" = přímý pohyb
