@@ -1,12 +1,12 @@
-Dalsi prisery - do vlastnich file
-Dasli priery napady - rizena prisera do miny, jinak do playera, had z vicero casti. Prisare co udrzuje noc
+Jako privni pridej shock wave  a nejakeho tuheho enymyho
+Udelej obtiznost pro deti
+
+Dasli priery napady  had z vicero casti. Prisare co udrzuje noc. Priser co jde rovnou do playera
 Textura podkladu pro den a noci
 Zmenit vizual bota
-Casovani dalsich priser po nejakem case
-yaml config
 Model obtiznosti
 Usvit a zapad - jiny cas, jine vlastnosti?
-Zbrane  - svetelna atomovka, vice kanonu, navadene miny
+Zbrane  - svetelna atomovka, vice kanonu, navadene , shock wave
 Boss desing , level design mozna 
 Razna hudba
 Menu

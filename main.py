@@ -8,13 +8,15 @@ import arcade
 import math
 import yaml
 import random
+import os
+import glob
 from typing import Tuple, Optional
 
 # Import modulů
 from player import Player, Mine
 from infrastruktura import find_laser_collision_with_enemies, calculate_laser_end
 from enemies.base_enemy import BaseEnemy
-from enemies import Crab, Star
+from enemies import Crab, Star, Torpedo
 
 # ============================================================================
 # KONFIGURAČNÍ KONSTANTY (z game_config.yaml)
@@ -76,12 +78,42 @@ MAX_SPAWN_MARGIN = CONFIG['enemies']['spawn_margin']
 ENEMY_TYPES = {
     'crab': Crab,
     'star': Star,
+    'torpedo': Torpedo,
 }
 ENEMY_CONFIG = CONFIG['enemies_config']
+
+# Wave konfigurace
+WAVES_CONFIG = CONFIG.get('waves', [])
 
 # Nastav screen dimensions pro BaseEnemy (pro wraparound)
 BaseEnemy.SCREEN_WIDTH = SCREEN_WIDTH
 BaseEnemy.SCREEN_HEIGHT = SCREEN_HEIGHT
+
+# ============================================================================
+# HUDEBNÍ SYSTÉM
+# ============================================================================
+
+def load_music_files():
+    """Načti všechny MP3 soubory z music adresáře"""
+    music_dir = "music"
+    if not os.path.exists(music_dir):
+        print(f"Adresář {music_dir} neexistuje!")
+        return []
+    
+    mp3_files = glob.glob(os.path.join(music_dir, "*.mp3"))
+    mp3_files.sort()  # Seřaď abecedně
+    
+    if not mp3_files:
+        print(f"Žádné MP3 soubory v {music_dir}!")
+        return []
+    
+    print(f"Nalezeno {len(mp3_files)} hudebních souborů:")
+    for file in mp3_files:
+        print(f"  - {os.path.basename(file)}")
+    
+    return mp3_files
+
+MUSIC_FILES = load_music_files()
 
 
 class Game(arcade.Window):
@@ -146,13 +178,33 @@ class Game(arcade.Window):
         # Nepřátelé
         self.enemy_list = arcade.SpriteList(use_spatial_hash=False)
         
-        # Spawn timer
-        self.enemy_spawn_timer = 0
-        self.spawn_enemy()
+        # Spawn timery pro každého nepřítele samostatně
+        self.enemy_spawn_timers = {}
+        for enemy_type in ENEMY_TYPES.keys():
+            self.enemy_spawn_timers[enemy_type] = ENEMY_CONFIG[enemy_type]['spawn_time']
+        
+        # Celkový čas hry (pro start_time)
+        self.game_time = 0
+        
+        # Wave systém
+        self.waves = []
+        self.init_waves()
         
         # FPS tracking
         self.fps_display = 0
         self.fps_timer = 0
+        
+        # Hudba
+        self.current_music_index = 0
+        self.music_files = MUSIC_FILES
+        self.current_song_name = ""
+        self.song_name_display_timer = 0  # Timer pro zobrazení názvu (3 sekundy)
+        self.song_name_display_duration = 3.0  # 3 sekundy
+        self.current_music_player = None  # Aktuální přehrávač hudby
+        
+        # Spusť první píseň
+        if self.music_files:
+            self.play_next_song()
     
     def on_draw(self):
         """Vykreslení na obrazovku"""
@@ -235,6 +287,9 @@ class Game(arcade.Window):
         # Vykresli progress bar
         self.draw_charge_bar()
         
+        # Vykresli název písně
+        self.draw_song_name()
+        
         # Vykresli skóre
         self.vykresli_skore()
         
@@ -295,6 +350,27 @@ class Game(arcade.Window):
                 bar_bottom,
                 bar_top,
                 bar_fill_color
+            )
+    
+    def draw_song_name(self):
+        """Vykreslí název aktuální písně (pokud je timer aktivní)"""
+        if self.song_name_display_timer > 0:
+            # Umístění mezi dělo a skóre (více napravo)
+            text_x = SCREEN_WIDTH - 450
+            text_y = SCREEN_HEIGHT - 40
+            text_color = arcade.color.CYAN
+            
+            # Přidej symbol hudby
+            song_text = f"♪ {self.current_song_name} ♪"
+            
+            arcade.draw_text(
+                song_text,
+                text_x, text_y,
+                text_color,
+                16,
+                anchor_x="center",
+                anchor_y="center",
+                bold=True
             )
     
     def vykresli_skore(self):
@@ -425,11 +501,28 @@ class Game(arcade.Window):
         # Aktualizuj blikání min
         self.blink_timer += delta_time * BLINK_SPEED
         
-        # Spawn nepřátel
-        self.enemy_spawn_timer -= delta_time
-        if self.enemy_spawn_timer <= 0:
-            self.enemy_spawn_timer = ENEMY_SPAWN_TIME
-            self.spawn_enemy()
+        # Aktualizuj celkový čas hry
+        self.game_time += delta_time
+        
+        # Spawn nepřátel - každý typ samostatně
+        for enemy_type in ENEMY_TYPES.keys():
+            enemy_config = ENEMY_CONFIG[enemy_type]
+            
+            # Kontrola, zda už můžeme spawnovat tento typ (start_time)
+            if self.game_time < enemy_config['start_time']:
+                continue
+            
+            # Kontrola maximálního počtu
+            current_count = sum(1 for enemy in self.enemy_list 
+                              if enemy.ENEMY_TYPE_NAME == enemy_type)
+            if current_count >= enemy_config['max_count']:
+                continue
+            
+            # Aktualizuj spawn timer
+            self.enemy_spawn_timers[enemy_type] -= delta_time
+            if self.enemy_spawn_timers[enemy_type] <= 0:
+                self.enemy_spawn_timers[enemy_type] = enemy_config['spawn_time']
+                self.spawn_enemy(enemy_type)
         
         # Update nepřátel
         self.enemy_list.update(delta_time)
@@ -493,11 +586,23 @@ class Game(arcade.Window):
             
             if hit_enemies:
                 self.player.start_game_over()
+        
+        # Aktualizuj hudbu
+        self.update_music(delta_time)
+        
+        # Aktualizuj wave systém
+        self.update_waves(delta_time)
     
-    def spawn_enemy(self):
-        """Vytvoř nového nepřítele"""
-        # Vyber náhodně typ nepřítele
-        enemy_type = random.choice(list(ENEMY_TYPES.keys()))
+    def spawn_enemy(self, enemy_type=None):
+        """Vytvoř nového nepřítele
+        
+        Args:
+            enemy_type: Typ nepřítele ('crab', 'star', ...). Pokud None, vybere náhodně.
+        """
+        # Pokud není zadán typ, vyber náhodně
+        if enemy_type is None:
+            enemy_type = random.choice(list(ENEMY_TYPES.keys()))
+        
         EnemyClass = ENEMY_TYPES[enemy_type]
         
         # Vyber náhodný okraj
@@ -526,6 +631,11 @@ class Game(arcade.Window):
             enemy = EnemyClass(x, y, side_direction=None, target_x=center_x, target_y=center_y)
         else:
             enemy = EnemyClass(x, y, side_direction=None)
+        
+        # Pokud je to torpédo, nastav reference na miny a hráče
+        if enemy.MOVEMENT_TYPE == "seeking":
+            enemy.mine_list = self.mine_list
+            enemy.player = self.player
         
         # Pokud je to postranní pohyb (krab), nastav optimální směr
         if enemy.MOVEMENT_TYPE == "sideway":
@@ -579,8 +689,16 @@ class Game(arcade.Window):
         self.mine_list.clear()
         self.enemy_list.clear()
         
-        self.enemy_spawn_timer = 0
-        self.spawn_enemy()
+        # Reset spawn timerů pro každého nepřítele
+        for enemy_type in ENEMY_TYPES.keys():
+            self.enemy_spawn_timers[enemy_type] = ENEMY_CONFIG[enemy_type]['spawn_time']
+        
+        # Reset herního času
+        self.game_time = 0
+        
+        # Reset wave systému
+        for wave in self.waves:
+            wave['last_trigger'] = -999
         
         self.laser_active = False
         self.laser_charge_time = LASER_RECHARGE_TIME
@@ -593,6 +711,228 @@ class Game(arcade.Window):
         if not self.player.game_over:
             self.player.center_x = x
             self.player.center_y = y
+    
+    def init_waves(self):
+        """Inicializuj wave systém z konfigurace"""
+        for wave_config in WAVES_CONFIG:
+            wave = {
+                'name': wave_config['name'],
+                'trigger_time': wave_config['trigger_time'],
+                'repeat_interval': wave_config.get('repeat_interval', 0),
+                'last_trigger': -999,  # Čas posledního spuštění
+                'enemies': wave_config['enemies']
+            }
+            self.waves.append(wave)
+        
+        if self.waves:
+            print(f"Načteno {len(self.waves)} vln nepřátel")
+    
+    def update_waves(self, delta_time):
+        """Aktualizuj wave systém - kontrola časů a spouštění vln"""
+        for wave in self.waves:
+            # Kontrola, zda je čas spustit vlnu
+            time_since_last = self.game_time - wave['last_trigger']
+            
+            # První spuštění
+            if wave['last_trigger'] < 0 and self.game_time >= wave['trigger_time']:
+                self.spawn_wave(wave)
+                wave['last_trigger'] = self.game_time
+            # Opakování
+            elif wave['repeat_interval'] > 0 and time_since_last >= wave['repeat_interval']:
+                self.spawn_wave(wave)
+                wave['last_trigger'] = self.game_time
+    
+    def spawn_wave(self, wave):
+        """Spusť vlnu - spawn všech nepřátel z vlny"""
+        print(f"🌊 WAVE: {wave['name']}")
+        
+        for enemy_config in wave['enemies']:
+            enemy_type = enemy_config['type']
+            count = enemy_config['count']
+            pattern = enemy_config['spawn_pattern']
+            
+            # Spawn podle pattern
+            if pattern == "circle":
+                self.spawn_wave_circle(enemy_type, count)
+            elif pattern == "left":
+                self.spawn_wave_left(enemy_type, count)
+            elif pattern == "right":
+                self.spawn_wave_right(enemy_type, count)
+    
+    def spawn_wave_circle(self, enemy_type, count):
+        """Spawn nepřátel v kruhu kolem obrazovky"""
+        EnemyClass = ENEMY_TYPES[enemy_type]
+        center_x = SCREEN_WIDTH // 2
+        center_y = SCREEN_HEIGHT // 2
+        
+        for i in range(count):
+            # Rozděl kruhem rovnoměrně
+            angle = (360 / count) * i
+            angle_rad = math.radians(angle)
+            
+            # Vyber vzdálenost od středu (na okraji obrazovky)
+            # Použij větší z rozměrů + margin
+            distance = max(SCREEN_WIDTH, SCREEN_HEIGHT) // 2 + 50
+            
+            x = center_x + distance * math.cos(angle_rad)
+            y = center_y + distance * math.sin(angle_rad)
+            
+            # Vytvoř nepřítele směřujícího ke středu
+            if EnemyClass.MOVEMENT_TYPE == "direct":
+                enemy = EnemyClass(x, y, side_direction=None, target_x=center_x, target_y=center_y)
+            else:
+                enemy = EnemyClass(x, y, side_direction=None)
+            
+            # Nastavení pro torpédo
+            if enemy.MOVEMENT_TYPE == "seeking":
+                enemy.mine_list = self.mine_list
+                enemy.player = self.player
+            
+            # Pro krab/sideway nastav směr směrem ke středu
+            if enemy.MOVEMENT_TYPE == "sideway":
+                dx = center_x - x
+                dy = center_y - y
+                angle_to_center = math.degrees(math.atan2(dy, dx))
+                
+                crab_angle = enemy.angle
+                movement_left = abs(crab_angle + (-90))
+                movement_right = abs(crab_angle + 90)
+                
+                angle_to_center_norm = angle_to_center % 360
+                if angle_to_center_norm < 0:
+                    angle_to_center_norm += 360
+                
+                movement_left_norm = movement_left % 360
+                movement_right_norm = movement_right % 360
+                
+                diff_left = min(abs(movement_left_norm - angle_to_center_norm), 
+                               360 - abs(movement_left_norm - angle_to_center_norm))
+                diff_right = min(abs(movement_right_norm - angle_to_center_norm), 
+                                360 - abs(movement_right_norm - angle_to_center_norm))
+                
+                if diff_left < diff_right:
+                    enemy.side_direction = -1
+                else:
+                    enemy.side_direction = 1
+                
+                if enemy.side_direction == -1:
+                    movement_angle_degrees = enemy.angle + (-90)
+                else:
+                    movement_angle_degrees = enemy.angle + 90
+                movement_angle_rad = math.radians(abs(movement_angle_degrees))
+                enemy.change_x = math.cos(movement_angle_rad) * enemy.SPEED
+                enemy.change_y = math.sin(movement_angle_rad) * enemy.SPEED
+            
+            self.enemy_list.append(enemy)
+    
+    def spawn_wave_left(self, enemy_type, count):
+        """Spawn nepřátel na levé straně směřujících doprava"""
+        EnemyClass = ENEMY_TYPES[enemy_type]
+        margin = EnemyClass.RADIUS + 30
+        
+        # Cíl napravo
+        target_x = SCREEN_WIDTH + 100
+        
+        for i in range(count):
+            # Rozděl rovnoměrně po levé straně
+            y = (SCREEN_HEIGHT / (count + 1)) * (i + 1)
+            x = -margin
+            
+            target_y = y  # Stejná výška
+            
+            # Vytvoř nepřítele
+            if EnemyClass.MOVEMENT_TYPE == "direct":
+                enemy = EnemyClass(x, y, side_direction=None, target_x=target_x, target_y=target_y)
+            else:
+                enemy = EnemyClass(x, y, side_direction=None)
+                # Pro sideway nastav směr doprava
+                enemy.change_x = enemy.SPEED
+                enemy.change_y = 0
+            
+            # Nastavení pro torpédo
+            if enemy.MOVEMENT_TYPE == "seeking":
+                enemy.mine_list = self.mine_list
+                enemy.player = self.player
+            
+            self.enemy_list.append(enemy)
+    
+    def spawn_wave_right(self, enemy_type, count):
+        """Spawn nepřátel na pravé straně směřujících doleva"""
+        EnemyClass = ENEMY_TYPES[enemy_type]
+        margin = EnemyClass.RADIUS + 30
+        
+        # Cíl nalevo
+        target_x = -100
+        
+        for i in range(count):
+            # Rozděl rovnoměrně po pravé straně
+            y = (SCREEN_HEIGHT / (count + 1)) * (i + 1)
+            x = SCREEN_WIDTH + margin
+            
+            target_y = y  # Stejná výška
+            
+            # Vytvoř nepřítele
+            if EnemyClass.MOVEMENT_TYPE == "direct":
+                enemy = EnemyClass(x, y, side_direction=None, target_x=target_x, target_y=target_y)
+            else:
+                enemy = EnemyClass(x, y, side_direction=None)
+                # Pro sideway nastav směr doleva
+                enemy.change_x = -enemy.SPEED
+                enemy.change_y = 0
+            
+            # Nastavení pro torpédo
+            if enemy.MOVEMENT_TYPE == "seeking":
+                enemy.mine_list = self.mine_list
+                enemy.player = self.player
+            
+            self.enemy_list.append(enemy)
+    
+    def play_next_song(self):
+        """Přehraj další píseň v seznamu (cyklicky)"""
+        if not self.music_files:
+            return
+        
+        # Zastav předchozí píseň, pokud hraje
+        if self.current_music_player:
+            # V Arcade používáme delete() pro zastavení a uvolnění playeru
+            self.current_music_player.delete()
+            self.current_music_player = None
+        
+        # Načti aktuální píseň
+        current_file = self.music_files[self.current_music_index]
+        
+        # Extrahuj název (bez .mp3)
+        self.current_song_name = os.path.basename(current_file).replace('.mp3', '')
+        
+        # Reset timeru pro zobrazení názvu
+        self.song_name_display_timer = self.song_name_display_duration
+        
+        # Přehraj píseň pomocí Arcade
+        # streaming=True pro velké hudební soubory (nenahrává celý soubor do paměti)
+        music_sound = arcade.load_sound(current_file, streaming=True)
+        self.current_music_player = music_sound.play(volume=0.5)
+        
+        print(f"♪ Přehrávám: {self.current_song_name}")
+        
+        # Přejdi na další píseň (cyklicky)
+        self.current_music_index = (self.current_music_index + 1) % len(self.music_files)
+    
+    def update_music(self, delta_time):
+        """Aktualizuj hudbu - kontrola konce písně"""
+        # Kontrola, zda píseň skončila
+        if self.current_music_player:
+            # get_stream_position() vrací pozici přehrávání
+            # Pokud je None nebo player už neexistuje, píseň skončila
+            if not self.current_music_player.playing:
+                # Píseň skončila, přehraj další
+                self.play_next_song()
+        elif self.music_files:
+            # Žádný player, ale máme soubory -> spusť první
+            self.play_next_song()
+        
+        # Aktualizuj timer pro zobrazení názvu
+        if self.song_name_display_timer > 0:
+            self.song_name_display_timer -= delta_time
     
     def can_fire_laser(self):
         """Zkontroluj, zda lze střílet"""
