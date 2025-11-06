@@ -21,6 +21,7 @@ class BaseEnemy(arcade.Sprite):
     SCALE_MULTIPLIER = 2
     MOVEMENT_TYPE = "sideway"  # "sideway" nebo "direct"
     DIRECTION_CHANGE_TIME_RANGE = [5, 12]  # [min, max] sekund
+    MAX_HEALTH = 1  # Kolik hitů vydrží nepřítel
     
     # Třídní proměnné pro screen dimensions (nastaví se z main)
     SCREEN_WIDTH = 1600
@@ -69,6 +70,10 @@ class BaseEnemy(arcade.Sprite):
         self.explode_timer = 0
         self.blink_state = False
         
+        # Životy
+        self.health = self.MAX_HEALTH
+        self.max_health = self.MAX_HEALTH
+        
         # Rotace - náhodně
         random_angle = random.uniform(0, 360)
         self.angle = -random_angle
@@ -105,6 +110,8 @@ class BaseEnemy(arcade.Sprite):
             self._setup_sideway_movement(side_direction)
         elif self.MOVEMENT_TYPE == "direct":
             self._setup_direct_movement()
+        elif self.MOVEMENT_TYPE == "player_seeking":
+            self._setup_player_seeking_movement()
         else:
             self._setup_sideway_movement(side_direction)
     
@@ -148,10 +155,18 @@ class BaseEnemy(arcade.Sprite):
             
             self.change_x = math.cos(movement_angle_rad) * self.SPEED
             self.change_y = math.sin(movement_angle_rad) * self.SPEED
+    
+    def _setup_player_seeking_movement(self):
+        """Pohyb sledující hráče (Prudic)"""
+        # Inicializuj player reference (nastaví se z main.py při spawnu)
+        self.player = None
         
-        # Bez změny směru (hvězda jde rovně)
+        # Časovač pro změnu směru (update pohybu směrem k hráči)
         self.movement_timer = 0
-        self.direction_change_time = float('inf')
+        self.direction_change_time = random.uniform(
+            self.DIRECTION_CHANGE_TIME_RANGE[0],
+            self.DIRECTION_CHANGE_TIME_RANGE[1]
+        )
     
     def update(self, delta_time: float = 1/60):
         """Update pozice a pohybového vzoru"""
@@ -185,6 +200,8 @@ class BaseEnemy(arcade.Sprite):
         # Aktualizuj pohyb podle typu
         if self.MOVEMENT_TYPE == "sideway":
             self._update_sideway_movement(delta_time)
+        elif self.MOVEMENT_TYPE == "player_seeking":
+            self._update_player_seeking_movement(delta_time)
     
     def _handle_wraparound(self):
         """Zabal nepřítele kolem okrajů obrazovky"""
@@ -229,11 +246,51 @@ class BaseEnemy(arcade.Sprite):
             self.change_x = math.cos(movement_angle_rad) * self.SPEED
             self.change_y = math.sin(movement_angle_rad) * self.SPEED
     
+    def _update_player_seeking_movement(self, delta_time: float):
+        """Aktualizuj pohyb sledující hráče (Prudic)"""
+        self.movement_timer += delta_time
+        
+        # Pravidelně aktualizuj směr k hráči
+        if self.movement_timer >= self.direction_change_time:
+            self.movement_timer = 0
+            self.direction_change_time = random.uniform(
+                self.DIRECTION_CHANGE_TIME_RANGE[0],
+                self.DIRECTION_CHANGE_TIME_RANGE[1]
+            )
+            
+            # Směřuj k hráči
+            if self.player and hasattr(self.player, 'center_x'):
+                dx = self.player.center_x - self.center_x
+                dy = self.player.center_y - self.center_y
+                angle_to_player = math.atan2(dy, dx)
+                
+                self.change_x = math.cos(angle_to_player) * self.SPEED
+                self.change_y = math.sin(angle_to_player) * self.SPEED
+                
+                # Nastav rotaci sprite podle směru pohybu
+                self.angle = -math.degrees(angle_to_player)
+    
+    def take_damage(self, damage: int = 1):
+        """Ubeř život nepříteli
+        
+        Args:
+            damage: Kolik životů ubrat
+        
+        Returns:
+            True pokud nepřítel zemřel, False pokud přežil
+        """
+        self.health -= damage
+        if self.health <= 0:
+            self.start_explosion()
+            return True
+        return False
+    
     def start_explosion(self):
         """Začni výbuch"""
         self.exploding = True
         self.explode_timer = 0.2
         self.blink_state = True
+        self.health = 0
     
     def update_explosion(self):
         """Aktualizuj vizuál výbuchu"""

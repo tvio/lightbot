@@ -7,13 +7,14 @@ import arcade
 class Player(arcade.Sprite):
     """Sprite pro hráče (robota)"""
     
-    def __init__(self, x: float, y: float, radius: int):
+    def __init__(self, x: float, y: float, radius: int, max_shockwave_charges: int = 7):
         """
         Inicializuj hráče
         
         Args:
             x, y: Počáteční pozice
             radius: Poloměr robota
+            max_shockwave_charges: Maximální počet shockwave vln
         """
         # Vytvoř texturu pro hráče (bílý kruh)
         player_texture = arcade.make_soft_circle_texture(
@@ -29,6 +30,10 @@ class Player(arcade.Sprite):
         self.game_over = False
         self.explode_timer = 0
         self.blink_state = False
+        
+        # Shockwave baterie
+        self.max_shockwave_charges = max_shockwave_charges
+        self.shockwave_charges = max_shockwave_charges
     
     def start_game_over(self):
         """Začni konec hry - zčervení a blikání"""

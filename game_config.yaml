@@ -24,10 +24,18 @@ laser:
   duration: 0.1 # Jak dlouho laser svítí (sekundy)
   recharge_time: 0.4 # Čas dobití po střelbě
 
+# Shockwave (noční obrana)
+shockwave:
+  max_charges: 20 # Počet použití před vybitím baterie
+  radius: 100 # Poloměr vlny (v pixelech)
+  animation_duration: 0.3 # Jak dlouho trvá animace vlny (sekundy)
+  wave_color: [255, 255, 255] # Barva vlny
+
 # Den/Noc cyklus
 day_night:
   day_length: 30.0
   night_length: 30.0
+  start_with_day: false # true = začne dnem, false = začne nocí
   day_background_color: [56, 53, 48]
   night_background_color: [0, 0, 0]
 
@@ -80,6 +88,19 @@ enemies_config:
     start_time: 0 # Kdy začne spawovat (sekundy od začátku hry)
     spawn_time: 5 # Jak často se spawnuje (sekundy)
     max_count: 10 # Maximální počet na mapě
+
+  prudic:
+    radius: 20
+    speed: 0.8
+    animation_path: "pict/prudic.gif"
+    animation_frame_duration: 0.15
+    scale_multiplier: 2
+    movement_direction_change_time: [1, 2] # Aktualizuje směr každých 1-2 sekundy
+    movement_type: "player_seeking" # "player_seeking" = sleduje hráče
+    max_health: 5 # Vydrží 5 hitů
+    start_time: 0 # Kdy začne spawovat (sekundy od začátku hry)
+    spawn_time: 30 # Jak často se spawnuje (sekundy)
+    max_count: 5 # Maximální počet na mapě
 
 # Vlny nepřátel (waves)
 # Spawn patterns: "circle" (kolem obrazovky), "left" (zleva doprava), "right" (zprava doleva)

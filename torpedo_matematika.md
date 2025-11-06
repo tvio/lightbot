@@ -1,7 +1,9 @@
 # Matematika torpéda - Dokumentace algoritmu
 
 ## Přehled
+
 Torpédo je inteligentní nepřítel, který:
+
 1. Vyhledává nejbližší minu
 2. Pokud není mina, směřuje na hráče
 3. Otáčí se plynule (ne okamžitě o 180°)
@@ -9,6 +11,7 @@ Torpédo je inteligentní nepřítel, který:
 ## 1. Hledání nejbližší miny
 
 ### Algoritmus
+
 ```
 Pro každou minu v seznamu:
     1. Vypočítej vzdálenost k torpédu
@@ -16,6 +19,7 @@ Pro každou minu v seznamu:
 ```
 
 ### Matematika
+
 Euklidovská vzdálenost mezi dvěma body:
 
 ```
@@ -25,6 +29,7 @@ distance = √(dx² + dy²)
 ```
 
 **Proč to funguje:**
+
 - `dx` a `dy` jsou složky vektoru od torpéda k mině
 - Pythagorova věta dává přímou vzdálenost
 
@@ -35,12 +40,14 @@ distance = √(dx² + dy²)
 ## 2. Výpočet úhlu k cíli
 
 ### Algoritmus
+
 ```
 1. Vypočítaj vektor k cíli (dx, dy)
 2. Použij arctangens pro získání úhlu
 ```
 
 ### Matematika
+
 ```
 dx = target.x - torpedo.x
 dy = target.y - torpedo.y
@@ -48,11 +55,13 @@ angle = atan2(dy, dx)
 ```
 
 **Proč `atan2` a ne `atan`:**
+
 - `atan(dy/dx)` funguje pouze pro 2 kvadranty (-90° až +90°)
 - `atan2(dy, dx)` funguje pro všech 360° a správně zachází se znaménky
 - Vrací úhel v radiánech v rozsahu [-π, π]
 
 **Koordinátní systém:**
+
 ```
          +y (90°, π/2)
           |
@@ -70,16 +79,19 @@ angle = atan2(dy, dx)
 ## 3. Plynulé otáčení (nejdůležitější část!)
 
 ### Problém
+
 Pokud torpédo letí doprava (0°) a cíl je nalevo (180°), nechceme okamžitou změnu směru. To by vypadalo nerealisticky.
 
 ### Řešení: Postupné otáčení s omezenou rychlostí
 
 ### Krok 1: Vypočítej rozdíl úhlů
+
 ```
 angle_diff = target_angle - current_angle
 ```
 
 **Příklad:**
+
 - Aktuální úhel: 45° (severovýchod)
 - Cílový úhel: 135° (severozápad)
 - Rozdíl: 135° - 45° = 90°
@@ -96,6 +108,7 @@ while angle_diff < -π:
 ```
 
 **Příklady:**
+
 ```
 Příklad 1:
 - Současný: 10° (0.174 rad)
@@ -111,6 +124,7 @@ Příklad 2:
 ```
 
 **Vizualizace:**
+
 ```
      90°
       |
@@ -142,11 +156,13 @@ else:
 ```
 
 **Parametry:**
+
 - `MAX_ROTATION_SPEED = 120°/s` (2 radiány/s)
 - Při 60 FPS: `delta_time = 1/60 ≈ 0.0167s`
 - Max otočení za frame: `120° * 0.0167 = 2°`
 
 **Příklad s postupným otáčením:**
+
 ```
 Frame 0: current = 0°,   target = 90°,  diff = 90°
          → otoč o 2° → new = 2°
@@ -179,12 +195,14 @@ change_y = sin(movement_angle) * SPEED
 ```
 
 **Matematika:**
+
 - `movement_angle` je úhel v radiánech
 - `cos(angle)` dává x-ovou složku jednotkového vektoru
 - `sin(angle)` dává y-ovou složku jednotkového vektoru
 - Vynásobením rychlostí (`SPEED`) získáme výsledný vektor rychlosti
 
 **Vizualizace:**
+
 ```
          y
          ↑
@@ -213,7 +231,7 @@ change_y = speed * sin(θ)
 2. Najdi cíl:
    a) Hledej nejbližší minu
    b) Pokud není, cílový je hráč
-   
+
 3. Vypočítej úhel k cíli
    angle_to_target = atan2(target_y - my_y, target_x - my_x)
 
@@ -238,6 +256,7 @@ change_y = speed * sin(θ)
 ## Parametry pro ladění
 
 ### Rychlost otáčení (`MAX_ROTATION_SPEED`)
+
 ```
 60°/s  → Pomalé, plynulé (1.5s pro 90°)
 120°/s → Výchozí (0.75s pro 90°) ✓
@@ -246,6 +265,7 @@ change_y = speed * sin(θ)
 ```
 
 ### Frekvence přehodnocení cíle (`DIRECTION_CHANGE_TIME_RANGE`)
+
 ```
 0.1s → Velmi responsivní, může se zdát nervózní
 0.5s → Výchozí, dobrá rovnováha ✓
@@ -253,6 +273,7 @@ change_y = speed * sin(θ)
 ```
 
 ### Rychlost pohybu (`SPEED`)
+
 ```
 0.8  → Pomalé
 1.2  → Výchozí ✓
@@ -265,18 +286,22 @@ change_y = speed * sin(θ)
 ## Debugging tipy
 
 ### Když torpédo osciluje kolem cíle:
+
 - Zvětši `MAX_ROTATION_SPEED` (může se otočit rychleji)
 - Zmenši `SPEED` (menší překmit)
 
 ### Když torpédo reaguje příliš pomalu:
+
 - Zmenši `DIRECTION_CHANGE_TIME_RANGE` (častější přehodnocení)
 - Zvětši `MAX_ROTATION_SPEED` (rychlejší otáčení)
 
 ### Když torpédo dělá náhlé pohyby:
+
 - Zmenši `MAX_ROTATION_SPEED` (plynulejší otáčení)
 - Zkontroluj normalizaci úhlů (měla by vybrat nejkratší cestu)
 
 ### Vizualizace pro debugging:
+
 ```python
 # Přidej do on_draw() v main.py:
 for torpedo in torpedos:
@@ -284,7 +309,7 @@ for torpedo in torpedos:
         # Nakresli čáru k cíli
         arcade.draw_line(
             torpedo.center_x, torpedo.center_y,
-            torpedo.current_target.center_x, 
+            torpedo.current_target.center_x,
             torpedo.current_target.center_y,
             arcade.color.RED, 2
         )
@@ -295,17 +320,22 @@ for torpedo in torpedos:
 ## Rozšíření (budoucí možnosti)
 
 ### Predikce pohybu cíle
+
 Místo cílení na aktuální pozici hráče můžeme předpovědět, kde bude:
+
 ```python
 predicted_x = player.center_x + player.change_x * prediction_time
 predicted_y = player.center_y + player.change_y * prediction_time
 ```
 
 ### Vyhýbání se překážkám
+
 Přidat kontrolu kolizí a mírné vychýlení trajektorie.
 
 ### Variabilní rychlost
+
 Torpédo by mohlo zrychlovat směrem k cíli:
+
 ```python
 distance_to_target = ...
 speed = base_speed + (max_speed - base_speed) * min(1.0, distance_to_target / activation_range)
@@ -339,4 +369,3 @@ vᵧ = speed × sin(angle)
 **Autor:** LightBot AI  
 **Verze:** 1.0  
 **Datum:** 2025-11-05
-

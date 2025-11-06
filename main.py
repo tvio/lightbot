@@ -16,7 +16,7 @@ from typing import Tuple, Optional
 from player import Player, Mine
 from infrastruktura import find_laser_collision_with_enemies, calculate_laser_end
 from enemies.base_enemy import BaseEnemy
-from enemies import Crab, Star, Torpedo
+from enemies import Crab, Star, Torpedo, Prudic
 
 # ============================================================================
 # KONFIGURAČNÍ KONSTANTY (z game_config.yaml)
@@ -61,8 +61,14 @@ ROTATION_SPEED = CONFIG['cannon']['rotation_speed']
 LASER_DURATION = CONFIG['laser']['duration']
 LASER_RECHARGE_TIME = CONFIG['laser']['recharge_time']
 
+SHOCKWAVE_MAX_CHARGES = CONFIG['shockwave']['max_charges']
+SHOCKWAVE_RADIUS = CONFIG['shockwave']['radius']
+SHOCKWAVE_ANIMATION_DURATION = CONFIG['shockwave']['animation_duration']
+SHOCKWAVE_COLOR = tuple(CONFIG['shockwave']['wave_color'])
+
 DAY_LENGTH = CONFIG['day_night']['day_length']
 NIGHT_LENGTH = CONFIG['day_night']['night_length']
+START_WITH_DAY = CONFIG['day_night']['start_with_day']
 DAY_BACKGROUND_COLOR = tuple(CONFIG['day_night']['day_background_color'])
 NIGHT_BACKGROUND_COLOR = tuple(CONFIG['day_night']['night_background_color'])
 
@@ -79,6 +85,7 @@ ENEMY_TYPES = {
     'crab': Crab,
     'star': Star,
     'torpedo': Torpedo,
+    'prudic': Prudic,
 }
 ENEMY_CONFIG = CONFIG['enemies_config']
 
@@ -88,6 +95,14 @@ WAVES_CONFIG = CONFIG.get('waves', [])
 # Nastav screen dimensions pro BaseEnemy (pro wraparound)
 BaseEnemy.SCREEN_WIDTH = SCREEN_WIDTH
 BaseEnemy.SCREEN_HEIGHT = SCREEN_HEIGHT
+
+# Aplikuj konfiguraci na enemy třídy
+for enemy_type_name, EnemyClass in ENEMY_TYPES.items():
+    if enemy_type_name in ENEMY_CONFIG:
+        enemy_cfg = ENEMY_CONFIG[enemy_type_name]
+        # Nastav MAX_HEALTH z configu, pokud existuje
+        if 'max_health' in enemy_cfg:
+            EnemyClass.MAX_HEALTH = enemy_cfg['max_health']
 
 # ============================================================================
 # HUDEBNÍ SYSTÉM
@@ -134,7 +149,7 @@ class Game(arcade.Window):
         self.score = 0
         
         # Hráč sprite
-        self.player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, ROBOT_RADIUS)
+        self.player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, ROBOT_RADIUS, SHOCKWAVE_MAX_CHARGES)
         self.player_list = arcade.SpriteList(use_spatial_hash=False)
         self.player_list.append(self.player)
         
@@ -143,7 +158,7 @@ class Game(arcade.Window):
         
         # Animace zmizení děla v noci
         self.cannon_fade_time = 2.0
-        self.cannon_fade_timer = 0.0
+        self.cannon_fade_timer = 0.0 if START_WITH_DAY else self.cannon_fade_time
         
         # Klávesy pro rotaci
         self.rotate_left = False
@@ -158,13 +173,16 @@ class Game(arcade.Window):
         self.laser_end_y = 0
         self.debug_shot_count = 0
         
-        # Systém dobití
-        self.laser_charge_time = LASER_RECHARGE_TIME
-        
         # Den/Noc
-        self.is_day = True
-        self.day_night_timer = DAY_LENGTH
-        self.player_color_day = True
+        self.is_day = START_WITH_DAY
+        
+        # Systém dobití
+        self.laser_charge_time = LASER_RECHARGE_TIME if START_WITH_DAY else 0
+        if self.is_day:
+            self.day_night_timer = DAY_LENGTH
+        else:
+            self.day_night_timer = NIGHT_LENGTH
+        self.player_color_day = self.is_day
         
         # Nastav barvu hráče
         self.player.update_color(self.is_day, DAY_ROBOT_COLOR, NIGHT_ROBOT_COLOR)
@@ -174,6 +192,11 @@ class Game(arcade.Window):
         
         # Časovač pro blikání min
         self.blink_timer = 0
+        
+        # Shockwave animace
+        self.shockwave_active = False
+        self.shockwave_timer = 0
+        self.shockwave_radius_current = 0
         
         # Nepřátelé
         self.enemy_list = arcade.SpriteList(use_spatial_hash=False)
@@ -284,8 +307,21 @@ class Game(arcade.Window):
                 3
             )
         
-        # Vykresli progress bar
-        self.draw_charge_bar()
+        # Vykresli shockwave animaci
+        if self.shockwave_active and not self.player.game_over:
+            arcade.draw_circle_outline(
+                self.player.center_x,
+                self.player.center_y,
+                self.shockwave_radius_current,
+                SHOCKWAVE_COLOR,
+                3
+            )
+        
+        # Vykresli banner podle dne/noci
+        if self.is_day:
+            self.draw_cannon_bar()
+        else:
+            self.draw_battery_bar()
         
         # Vykresli název písně
         self.draw_song_name()
@@ -300,8 +336,8 @@ class Game(arcade.Window):
         self.fps_text.text = f"FPS: {fps:.1f}"
         self.fps_text.draw()
     
-    def draw_charge_bar(self):
-        """Vykreslí progress bar pro dobití"""
+    def draw_cannon_bar(self):
+        """Vykreslí progress bar pro dobití děla (den)"""
         bar_x = SCREEN_WIDTH // 2
         bar_y = SCREEN_HEIGHT - 40
         bar_width = 300
@@ -313,7 +349,59 @@ class Game(arcade.Window):
         bar_outline_color = arcade.color.WHITE
         bar_fill_color = arcade.color.WHITE
         
-        text_label = "Světelné dělo :"
+        text_label = "Světelné dělo:"
+        text_x = bar_x - bar_width // 2 - 120
+        text_y = bar_y
+        
+        arcade.draw_text(
+            text_label,
+            text_x, text_y,
+            text_color,
+            16,
+            anchor_x="left",
+            anchor_y="center"
+        )
+        
+        bar_left = bar_x - bar_width // 2
+        bar_bottom = bar_y - bar_height // 2
+        bar_top = bar_y + bar_height // 2
+        
+        border_width = 2
+        arcade.draw_lbwh_rectangle_outline(
+            bar_left,
+            bar_bottom,
+            bar_width,
+            bar_height,
+            bar_outline_color,
+            border_width
+        )
+        
+        if charge_percentage > 0:
+            filled_width = bar_width * charge_percentage
+            filled_right = bar_left + filled_width
+            
+            arcade.draw_lrbt_rectangle_filled(
+                bar_left,
+                filled_right,
+                bar_bottom,
+                bar_top,
+                bar_fill_color
+            )
+    
+    def draw_battery_bar(self):
+        """Vykreslí banner baterie pro shockwave (noc)"""
+        bar_x = SCREEN_WIDTH // 2
+        bar_y = SCREEN_HEIGHT - 40
+        bar_width = 300
+        bar_height = 20
+        
+        charge_percentage = self.player.shockwave_charges / self.player.max_shockwave_charges
+        
+        text_color = arcade.color.WHITE
+        bar_outline_color = arcade.color.WHITE
+        bar_fill_color = arcade.color.WHITE
+        
+        text_label = "Baterie (vln):"
         text_x = bar_x - bar_width // 2 - 120
         text_y = bar_y
         
@@ -424,8 +512,9 @@ class Game(arcade.Window):
         if hit and hit_enemy:
             self.laser_end_x = collision_x
             self.laser_end_y = collision_y
-            hit_enemy.start_explosion()
-            self.score += 1
+            # Udeř nepřítele (pokud zemře, přidej skóre)
+            if hit_enemy.take_damage(1):
+                self.score += 1
         else:
             self.laser_end_x = screen_end_x
             self.laser_end_y = screen_end_y
@@ -461,6 +550,8 @@ class Game(arcade.Window):
             else:
                 self.day_night_timer = NIGHT_LENGTH
                 self.laser_charge_time = 0
+                # Dobij baterii na začátku noci
+                self.player.shockwave_charges = SHOCKWAVE_MAX_CHARGES
         
         # Aktualizuj barvu hráče
         if previous_day_state != self.is_day or not hasattr(self, 'player_color_day'):
@@ -501,6 +592,36 @@ class Game(arcade.Window):
         # Aktualizuj blikání min
         self.blink_timer += delta_time * BLINK_SPEED
         
+        # Aktualizuj shockwave animaci
+        if self.shockwave_active:
+            self.shockwave_timer += delta_time
+            # Expanze vlny
+            progress = self.shockwave_timer / SHOCKWAVE_ANIMATION_DURATION
+            self.shockwave_radius_current = SHOCKWAVE_RADIUS * progress
+            
+            # Kontrola kolize s nepřáteli
+            for enemy in self.enemy_list:
+                if enemy.exploding:
+                    continue
+                
+                # Vzdálenost od hráče (mezi středy)
+                dx = enemy.center_x - self.player.center_x
+                dy = enemy.center_y - self.player.center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                
+                # Pokud okraj vlny dosáhne okraje nepřítele, zničit ho
+                # distance = vzdálenost mezi středy
+                # Pro kolizi: okraj vlny >= okraj nepřítele
+                if distance <= self.shockwave_radius_current + enemy.RADIUS:
+                    # Udeř nepřítele (pokud zemře, přidej skóre)
+                    if enemy.take_damage(1):
+                        self.score += 1
+            
+            # Konec animace
+            if self.shockwave_timer >= SHOCKWAVE_ANIMATION_DURATION:
+                self.shockwave_active = False
+                self.shockwave_timer = 0
+        
         # Aktualizuj celkový čas hry
         self.game_time += delta_time
         
@@ -538,13 +659,16 @@ class Game(arcade.Window):
             hit_mines = arcade.check_for_collision_with_list(enemy, self.mine_list)
             
             if hit_mines:
-                enemy.start_explosion()
-                enemies_to_remove.append(enemy)
-                self.score += 1
+                # Udeř nepřítele (pokud zemře, odstraň ho)
+                if enemy.take_damage(1):
+                    enemies_to_remove.append(enemy)
+                    self.score += 1
                 
-                for mine in hit_mines:
-                    if mine not in mines_to_remove:
-                        mines_to_remove.append(mine)
+                # Odstraň miny (jen pokud nepřítel zemřel, jinak jen poškození)
+                if enemy.health <= 0:
+                    for mine in hit_mines:
+                        if mine not in mines_to_remove:
+                            mines_to_remove.append(mine)
         
         for mine in mines_to_remove:
             mine.remove_from_sprite_lists()
@@ -637,6 +761,10 @@ class Game(arcade.Window):
             enemy.mine_list = self.mine_list
             enemy.player = self.player
         
+        # Pokud je to Prudic (player_seeking), nastav reference na hráče
+        if enemy.MOVEMENT_TYPE == "player_seeking":
+            enemy.player = self.player
+        
         # Pokud je to postranní pohyb (krab), nastav optimální směr
         if enemy.MOVEMENT_TYPE == "sideway":
             dx = center_x - x
@@ -676,13 +804,21 @@ class Game(arcade.Window):
         
         self.enemy_list.append(enemy)
     
+    def activate_shockwave(self):
+        """Aktivuje shockwave vlnu (pouze v noci a pokud má hráč náboje)"""
+        if not self.is_day and self.player.shockwave_charges > 0 and not self.shockwave_active:
+            self.shockwave_active = True
+            self.shockwave_timer = 0
+            self.shockwave_radius_current = 0
+            self.player.shockwave_charges -= 1
+    
     def restart_game(self):
         """Restart hry"""
         self.player.center_x = SCREEN_WIDTH // 2
         self.player.center_y = SCREEN_HEIGHT // 2
         self.player.game_over = False
         self.player.explode_timer = 0
-        self.player.update_color(self.is_day, DAY_ROBOT_COLOR, NIGHT_ROBOT_COLOR)
+        self.player.shockwave_charges = SHOCKWAVE_MAX_CHARGES
         
         self.score = 0
         
@@ -701,10 +837,19 @@ class Game(arcade.Window):
             wave['last_trigger'] = -999
         
         self.laser_active = False
-        self.laser_charge_time = LASER_RECHARGE_TIME
+        self.laser_charge_time = LASER_RECHARGE_TIME if START_WITH_DAY else 0
         
-        self.is_day = True
-        self.day_night_timer = DAY_LENGTH
+        self.is_day = START_WITH_DAY
+        if self.is_day:
+            self.day_night_timer = DAY_LENGTH
+        else:
+            self.day_night_timer = NIGHT_LENGTH
+        
+        # Reset animace děla
+        self.cannon_fade_timer = 0.0 if START_WITH_DAY else self.cannon_fade_time
+        
+        # Aktualizuj barvu hráče
+        self.player.update_color(self.is_day, DAY_ROBOT_COLOR, NIGHT_ROBOT_COLOR)
     
     def on_mouse_motion(self, x, y, dx, dy):
         """Pohyb myši"""
@@ -788,6 +933,10 @@ class Game(arcade.Window):
                 enemy.mine_list = self.mine_list
                 enemy.player = self.player
             
+            # Nastavení pro Prudic (player_seeking)
+            if enemy.MOVEMENT_TYPE == "player_seeking":
+                enemy.player = self.player
+            
             # Pro krab/sideway nastav směr směrem ke středu
             if enemy.MOVEMENT_TYPE == "sideway":
                 dx = center_x - x
@@ -854,6 +1003,10 @@ class Game(arcade.Window):
                 enemy.mine_list = self.mine_list
                 enemy.player = self.player
             
+            # Nastavení pro Prudic (player_seeking)
+            if enemy.MOVEMENT_TYPE == "player_seeking":
+                enemy.player = self.player
+            
             self.enemy_list.append(enemy)
     
     def spawn_wave_right(self, enemy_type, count):
@@ -883,6 +1036,10 @@ class Game(arcade.Window):
             # Nastavení pro torpédo
             if enemy.MOVEMENT_TYPE == "seeking":
                 enemy.mine_list = self.mine_list
+                enemy.player = self.player
+            
+            # Nastavení pro Prudic (player_seeking)
+            if enemy.MOVEMENT_TYPE == "player_seeking":
                 enemy.player = self.player
             
             self.enemy_list.append(enemy)
@@ -944,14 +1101,19 @@ class Game(arcade.Window):
             return
         
         if button == arcade.MOUSE_BUTTON_LEFT:
-            if not self.can_fire_laser():
-                return
-            
-            self.laser_active = True
-            self.laser_timer = LASER_DURATION
-            self.laser_charge_time = 0
-            self.debug_shot_count += 1
-            self.update_laser_position()
+            # V noci aktivuj shockwave místo laseru
+            if not self.is_day:
+                self.activate_shockwave()
+            else:
+                # Ve dne střílej laserem
+                if not self.can_fire_laser():
+                    return
+                
+                self.laser_active = True
+                self.laser_timer = LASER_DURATION
+                self.laser_charge_time = 0
+                self.debug_shot_count += 1
+                self.update_laser_position()
         elif button == arcade.MOUSE_BUTTON_RIGHT:
             if len(self.mine_list) < MAX_MINES:
                 mine = Mine(self.player.center_x, self.player.center_y, MINE_RADIUS, MINE_CORE_RADIUS)
