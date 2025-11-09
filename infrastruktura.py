@@ -7,6 +7,94 @@ import math
 from typing import Tuple, Optional, Dict, List
 
 
+def load_sprite_sheet(png_path: str, sprite_width: int, sprite_height: int, 
+                     columns: int, rows: int) -> Tuple[Optional[List], Optional[int]]:
+    """
+    Načte animační textury z PNG sprite sheetu pomocí vestavěné funkce Arcade.
+    
+    Arcade nemá přímo funkci pro načítání celého sprite sheetu, ale podporuje
+    načítání jednotlivých spritů pomocí parametrů image_x, image_y, image_width, image_height.
+    
+    Args:
+        png_path: Cesta k PNG souboru (např. "pict/prudicV2.png")
+        sprite_width: Šířka jednoho sprite v pixelech
+        sprite_height: Výška jednoho sprite v pixelech
+        columns: Počet sloupců v sprite sheetu
+        rows: Počet řádků v sprite sheetu
+    
+    Returns:
+        Tuple (textures_list, base_texture_size) nebo (None, None) pokud se nepodaří
+    """
+    try:
+        import os
+        # Zkontroluj, jestli soubor existuje
+        if not os.path.exists(png_path):
+            print(f"CHYBA: Sprite sheet soubor neexistuje: {png_path}")
+            return None, None
+        
+        textures = []
+        
+        # Načti každý sprite ze sprite sheetu pomocí vestavěné funkce Arcade
+        # Procházíme řádky shora dolů, sloupce zleva doprava
+        for row in range(rows):
+            for col in range(columns):
+                # Vypočítej pozici v sprite sheetu
+                x = col * sprite_width
+                y = row * sprite_height
+                
+                # Načti texture ze sprite sheetu pomocí vestavěné funkce Arcade
+                # Zkusíme různé varianty parametrů, protože dokumentace není jasná
+                try:
+                    # Zkusíme s parametry image_x, image_y, image_width, image_height
+                    texture = arcade.load_texture(
+                        png_path,
+                        image_x=x,
+                        image_y=y,
+                        image_width=sprite_width,
+                        image_height=sprite_height
+                    )
+                except TypeError:
+                    # Pokud to nefunguje, zkusíme s x, y, width, height
+                    try:
+                        texture = arcade.load_texture(
+                            png_path,
+                            x=x,
+                            y=y,
+                            width=sprite_width,
+                            height=sprite_height
+                        )
+                    except TypeError:
+                        # Pokud ani to nefunguje, použijeme PIL (fallback)
+                        print(f"Varování: arcade.load_texture nepodporuje sprite sheet parametry, používám PIL fallback")
+                        from PIL import Image
+                        import io
+                        sheet_image = Image.open(png_path)
+                        if sheet_image.mode != 'RGBA':
+                            sheet_image = sheet_image.convert('RGBA')
+                        sprite_box = (x, y, x + sprite_width, y + sprite_height)
+                        sprite_img = sheet_image.crop(sprite_box)
+                        img_bytes = io.BytesIO()
+                        sprite_img.save(img_bytes, format='PNG')
+                        img_bytes.seek(0)
+                        texture = arcade.load_texture(img_bytes)
+                
+                textures.append(texture)
+        
+        if textures:
+            print(f"Úspěšně načteno {len(textures)} textur ze sprite sheetu: {png_path}")
+            # Zjisti základní velikost (použijeme pro škálování)
+            test_texture = textures[0]
+            base_size = max(test_texture.width, test_texture.height)
+            return textures, base_size
+        else:
+            raise ValueError(f"Žádné sprites v sprite sheetu: {png_path}")
+    except Exception as e:
+        print(f"Nelze načíst sprite sheet: {png_path} - {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+
 def load_enemy_animations(gif_path: str) -> Tuple[Optional[List], Optional[int]]:
     """
     Načte animační textury z GIF souboru a uloží do cache (singleton pattern).

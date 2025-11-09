@@ -27,8 +27,8 @@ laser:
 # Shockwave (noční obrana)
 shockwave:
   max_charges: 20 # Počet použití před vybitím baterie
-  radius: 100 # Poloměr vlny (v pixelech)
-  animation_duration: 0.3 # Jak dlouho trvá animace vlny (sekundy)
+  radius: 80 # Poloměr vlny (v pixelech)
+  animation_duration: 0.2 # Jak dlouho trvá animace vlny (sekundy)
   wave_color: [255, 255, 255] # Barva vlny
 
 # Den/Noc cyklus
