@@ -1,0 +1,35 @@
+# Cursor Rules pro LightBot projekt
+
+## Obecné instrukce
+
+- Projekt používá **uv** jako package manager
+- Vždy používej `uv run python` místo `python` pro spouštění skriptů
+- Python verze: 3.13
+- Framework: Arcade 3.x
+
+## Struktura projektu
+
+- `main.py` - hlavní vstupní bod hry
+- `enemies/` - třídy nepřátel (BaseEnemy, Crab, Star, Torpedo, Prudic)
+- `pict/` - sprite sheety a obrázky
+- `music/` - hudební soubory
+- `game_config.yaml` - konfigurace hry
+- `infrastruktura.py` - sdílené utility funkce
+
+## Důležité poznámky
+
+- Sprite sheety se načítají pomocí `arcade.SpriteSheet` a `get_texture_grid()`
+- Pokud `SPRITE_WIDTH` nebo `SPRITE_HEIGHT` je 0, automaticky se vypočítá z velikosti obrázku
+- Nepřátelé používají cache pro animace (singleton pattern)
+- Vždy odpovídej v češtině
+
+## Spouštění příkazů
+
+- Testy: `uv run python test_*.py`
+- Hlavní hra: `uv run python main.py`
+- Nikdy nepoužívej `python` přímo, vždy `uv run python`
+
+## Debugging
+
+- Pro debug výpisy používej `print()` s prefixem `DEBUG:` nebo `VAROVÁNÍ:`
+- Sprite sheety: zkontroluj velikost obrázku a počet sloupců/řádků

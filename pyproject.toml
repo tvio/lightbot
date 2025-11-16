@@ -8,3 +8,34 @@ dependencies = [
     "arcade>=3.3.3",
     "pyyaml>=6.0.3",
 ]
+
+[tool.cursor]
+# Konfigurace pro Cursor AI / LLM
+# Tento projekt používá uv jako package manager
+
+# Jak spouštět Python skripty
+run_command = "uv run"
+
+# Jak spouštět testy
+test_command = "uv run"
+
+# Hlavní vstupní bod projektu
+main_file = "main.py"
+
+# Důležité adresáře
+source_dirs = ["enemies", "pict", "music"]
+test_dirs = []
+
+# Základní informace o projektu
+project_type = "arcade_game"
+language = "python"
+package_manager = "uv"
+python_version = "3.13"
+
+# Důležité poznámky
+notes = """
+- Projekt používá uv jako package manager - vždy používej 'uv run python' místo 'python'
+- Sprite sheety jsou v adresáři pict/
+- Enemy třídy jsou v adresáři enemies/
+- Konfigurace hry je v game_config.yaml
+"""

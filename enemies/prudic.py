@@ -4,6 +4,7 @@ Nepřítel Prudic - těžký nepřítel, který jde přímo na hráče a vydrž�
 """
 from .base_enemy import BaseEnemy
 import math
+import random
 from typing import Optional, List
 from infrastruktura import load_sprite_sheet
 import arcade
@@ -14,46 +15,50 @@ class Prudic(BaseEnemy):
     
     # Konfigurace Prudice
     ENEMY_TYPE_NAME = "prudic"
-    GIF_PATH = None  # Nepoužíváme GIF, používáme sprite sheet
-    SPRITE_SHEET_PATH = "pict/PrudicV2.png"  # Sprite sheet s 9 obrázky
-    SPRITE_WIDTH = 128  # Šířka jednoho sprite
-    SPRITE_HEIGHT = 128  # Výška jednoho sprite
-    SPRITE_COLUMNS = 3  # Počet sloupců v sprite sheetu
-    SPRITE_ROWS = 3  # Počet řádků v sprite sheetu (celkem 9 spritů)
+    GIF_PATH = None  # Nepoužíváme GIF
+    SPRITE_SHEET_PATH = None  # Nepoužíváme sprite sheet
+    SPRITE_IMAGE_PATH = "pict/prudicV4.png"  # Jeden PNG obrázek pro rotaci
+    SPRITE_WIDTH = 0  # Nepoužívá se
+    SPRITE_HEIGHT = 0  # Nepoužívá se
+    SPRITE_COLUMNS = 1  # Nepoužívá se
+    SPRITE_ROWS = 1  # Nepoužívá se
     
     RADIUS = 20
     SPEED = 0.8  # Pomalejší než ostatní
     ANIMATION_FRAME_DURATION = 0.15
-    SCALE_MULTIPLIER = 2
+    SCALE_MULTIPLIER = 4  # Zvětšeno o 100% (z 2 na 4)
     MOVEMENT_TYPE = "player_seeking"  # Jde přímo na hráče
-    DIRECTION_CHANGE_TIME_RANGE = [0.5, 0.5]  # Každých 0.5s přehodnocuje cíl (jako torpédo)
+    DIRECTION_CHANGE_TIME_RANGE = [0.5, 0.5]  # Každých 0.5s přehodnocuje cíl
     MAX_HEALTH = 5  # Vydrží 5 hitů
     
-    # Parametry otáčení (stejné jako torpédo)
+    # Parametry rotace obrázku (animace - nezávislá na směru pohybu)
+    ROTATION_SPEED = 120  # stupně za sekundu (360° za 3s)
+    
+    # Parametry otáčení směru pohybu (stejné jako torpédo)
     MAX_ROTATION_SPEED = 120  # stupně za sekundu
     
     @classmethod
     def _load_cached_animations(cls) -> Optional[List[arcade.Texture]]:
-        """Načti animace ze sprite sheetu - sdíleno mezi všemi instancemi"""
+        """Načti statický obrázek pro rotaci - sdíleno mezi všemi instancemi"""
         # Pokud máme v cache, vrátíme z cache
         if cls._animation_cache is not None:
             return cls._animation_cache
         
-        # Načteme sprite sheet
-        textures, base_size = load_sprite_sheet(
-            cls.SPRITE_SHEET_PATH,
-            cls.SPRITE_WIDTH,
-            cls.SPRITE_HEIGHT,
-            cls.SPRITE_COLUMNS,
-            cls.SPRITE_ROWS
-        )
-        
-        if textures:
+        # Načteme jeden PNG obrázek
+        try:
+            texture = arcade.load_texture(cls.SPRITE_IMAGE_PATH)
+            # Vytvoříme list s jedním texture (pro kompatibilitu s BaseEnemy)
+            textures = [texture]
+            
+            # Zjisti základní velikost
+            base_size = max(texture.width, texture.height)
+            
             cls._animation_cache = textures
             cls._base_texture_size = base_size
             return textures
-        
-        return None
+        except Exception as e:
+            print(f"CHYBA: Nelze nacist obrazek {cls.SPRITE_IMAGE_PATH}: {e}")
+            return None
     
     def __init__(self, x: float, y: float, side_direction: Optional[int] = None, 
                  target_x: Optional[float] = None, target_y: Optional[float] = None):
@@ -75,6 +80,9 @@ class Prudic(BaseEnemy):
         self.movement_angle = 0
         
         super().__init__(x, y, side_direction, target_x, target_y)
+        
+        # Úhel rotace obrázku (pro animaci rotace) - nezávislý na směru pohybu
+        self.rotation_angle = 0.0  # V stupních
     
     def _setup_movement(self, side_direction: Optional[int]):
         """Nastav pohyb pro Prudic - přepíše základní metodu"""
@@ -182,23 +190,20 @@ class Prudic(BaseEnemy):
             # 4. Aktualizuj rychlost podle směru
             self.change_x = math.cos(self.movement_angle) * self.SPEED
             self.change_y = math.sin(self.movement_angle) * self.SPEED
-            
-            # 5. Aktualizuj vizuální rotaci sprite
-            self.angle = -math.degrees(self.movement_angle)
     
     def update(self, delta_time: float = 1/60):
         """
-        Update pozice a chování sledování hráče
+        Update pozice a rotace obrázku
         
         Přepíše základní update metodu
         """
-        # Aktualizuj animaci (ze základní třídy)
-        if self.animation_textures and len(self.animation_textures) > 1 and not self.exploding:
-            self.animation_timer += delta_time
-            if self.animation_timer >= self.ANIMATION_FRAME_DURATION:
-                self.animation_timer = 0
-                self.current_frame = (self.current_frame + 1) % len(self.animation_textures)
-                self.texture = self.animation_textures[self.current_frame]
+        # Aktualizuj rotaci obrázku (animace - 360° za 3s) - nezávislá na směru pohybu
+        self.rotation_angle += self.ROTATION_SPEED * delta_time
+        if self.rotation_angle >= 360:
+            self.rotation_angle -= 360
+        
+        # Nastav vizuální rotaci sprite (nezávisle na směru pohybu)
+        self.angle = -self.rotation_angle  # Záporně kvůli Arcade konvenci
         
         # Pokud exploduje, použij základní logiku
         if self.exploding:

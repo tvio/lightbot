@@ -8,83 +8,78 @@ from typing import Tuple, Optional, Dict, List
 
 
 def load_sprite_sheet(png_path: str, sprite_width: int, sprite_height: int, 
-                     columns: int, rows: int) -> Tuple[Optional[List], Optional[int]]:
+                     columns: int, rows: int, margin: int = 0) -> Tuple[Optional[List], Optional[int]]:
     """
     Načte animační textury z PNG sprite sheetu pomocí vestavěné funkce Arcade.
     
-    Arcade nemá přímo funkci pro načítání celého sprite sheetu, ale podporuje
-    načítání jednotlivých spritů pomocí parametrů image_x, image_y, image_width, image_height.
+    Používá arcade.SpriteSheet a get_texture_grid() - oficiální API Arcade 3.x pro načítání sprite sheetů.
+    Dokumentace: https://api.arcade.academy/en/stable/api_docs/api/texture.html#arcade.SpriteSheet
     
     Args:
         png_path: Cesta k PNG souboru (např. "pict/prudicV2.png")
-        sprite_width: Šířka jednoho sprite v pixelech
-        sprite_height: Výška jednoho sprite v pixelech
+        sprite_width: Šířka jednoho sprite v pixelech (0 = automaticky z obrázku)
+        sprite_height: Výška jednoho sprite v pixelech (0 = automaticky z obrázku)
         columns: Počet sloupců v sprite sheetu
         rows: Počet řádků v sprite sheetu
+        margin: Margin na okrajích obrázku (v pixelech) - použije se pro všechny okraje (left, right, bottom, top)
     
     Returns:
         Tuple (textures_list, base_texture_size) nebo (None, None) pokud se nepodaří
     """
     try:
         import os
+        from PIL import Image
+        
         # Zkontroluj, jestli soubor existuje
         if not os.path.exists(png_path):
             print(f"CHYBA: Sprite sheet soubor neexistuje: {png_path}")
             return None, None
         
-        textures = []
+        # Načti obrázek pro výpočet velikosti
+        img = Image.open(png_path)
+        img_width, img_height = img.size
         
-        # Načti každý sprite ze sprite sheetu pomocí vestavěné funkce Arcade
-        # Procházíme řádky shora dolů, sloupce zleva doprava
-        for row in range(rows):
-            for col in range(columns):
-                # Vypočítej pozici v sprite sheetu
-                x = col * sprite_width
-                y = row * sprite_height
-                
-                # Načti texture ze sprite sheetu pomocí vestavěné funkce Arcade
-                # Zkusíme různé varianty parametrů, protože dokumentace není jasná
-                try:
-                    # Zkusíme s parametry image_x, image_y, image_width, image_height
-                    texture = arcade.load_texture(
-                        png_path,
-                        image_x=x,
-                        image_y=y,
-                        image_width=sprite_width,
-                        image_height=sprite_height
-                    )
-                except TypeError:
-                    # Pokud to nefunguje, zkusíme s x, y, width, height
-                    try:
-                        texture = arcade.load_texture(
-                            png_path,
-                            x=x,
-                            y=y,
-                            width=sprite_width,
-                            height=sprite_height
-                        )
-                    except TypeError:
-                        # Pokud ani to nefunguje, použijeme PIL (fallback)
-                        print(f"Varování: arcade.load_texture nepodporuje sprite sheet parametry, používám PIL fallback")
-                        from PIL import Image
-                        import io
-                        sheet_image = Image.open(png_path)
-                        if sheet_image.mode != 'RGBA':
-                            sheet_image = sheet_image.convert('RGBA')
-                        sprite_box = (x, y, x + sprite_width, y + sprite_height)
-                        sprite_img = sheet_image.crop(sprite_box)
-                        img_bytes = io.BytesIO()
-                        sprite_img.save(img_bytes, format='PNG')
-                        img_bytes.seek(0)
-                        texture = arcade.load_texture(img_bytes)
-                
-                textures.append(texture)
+        # Pokud není zadána velikost spritů, automaticky ji vypočítej z velikosti obrázku
+        # S ohledem na margin: celková šířka = 2*margin + columns*sprite_width + (columns-1)*margin
+        # Zjednodušeně: sprite_width = (img_width - 2*margin - (columns-1)*margin) / columns
+        # = (img_width - margin*(columns+1)) / columns
+        if sprite_width == 0 or sprite_height == 0:
+            print(f"DEBUG: Velikost obrázku: {img_width}x{img_height} px, columns={columns}, rows={rows}, margin={margin}")
+            
+            if sprite_width == 0:
+                sprite_width = (img_width - margin * (columns + 1)) // columns
+            if sprite_height == 0:
+                sprite_height = (img_height - margin * (rows + 1)) // rows
+            print(f"Automaticky vypočítaná velikost spritů: {sprite_width}x{sprite_height} px (z obrázku {img_width}x{img_height} px)")
         
-        if textures:
+        # Ověř, že velikost spritů je větší než 0
+        if sprite_width <= 0 or sprite_height <= 0:
+            raise ValueError(f"Neplatná velikost spritů: {sprite_width}x{sprite_height} px")
+        
+        # Vypočítej celkový počet spritů
+        count = columns * rows
+        
+        print(f"DEBUG: Načítám sprite sheet s parametry: size=({sprite_width}, {sprite_height}), columns={columns}, count={count}, margin={margin}")
+        
+        # V Arcade 3.x: Načti sprite sheet a použij get_texture_grid()
+        # Margin tuple: (left, right, bottom, top) - všechny hodnoty se vztahují k okrajům obrázku
+        sprite_sheet = arcade.SpriteSheet(png_path)
+        
+        textures = sprite_sheet.get_texture_grid(
+            size=(sprite_width, sprite_height),
+            columns=columns,
+            count=count,
+            margin=(margin, margin, margin, margin)  # (left, right, bottom, top) - stejný margin pro všechny okraje
+        )
+        
+        if textures and len(textures) > 0:
             print(f"Úspěšně načteno {len(textures)} textur ze sprite sheetu: {png_path}")
             # Zjisti základní velikost (použijeme pro škálování)
             test_texture = textures[0]
+            print(f"DEBUG: Velikost první textury: {test_texture.width}x{test_texture.height} px")
             base_size = max(test_texture.width, test_texture.height)
+            if base_size == 0:
+                print(f"VAROVÁNÍ: Textury mají nulovou velikost!")
             return textures, base_size
         else:
             raise ValueError(f"Žádné sprites v sprite sheetu: {png_path}")
