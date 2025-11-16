@@ -68,7 +68,7 @@ enemies_config:
   star:
     radius: 12
     speed: 1.5
-    animation_path: "pict/star-blue.gif"
+    animation_path: "pict/animated_star_pingpong.gif"
     animation_frame_duration: 0.1
     scale_multiplier: 1.5
     movement_direction_change_time: [3, 8] # Hvězda se otáčí rychleji
@@ -92,9 +92,9 @@ enemies_config:
   prudic:
     radius: 20
     speed: 0.8
-    animation_path: "pict/prudic.gif"
+    animation_path: "pict/prudicV4.png"
     animation_frame_duration: 0.15
-    scale_multiplier: 2
+    scale_multiplier: 4
     movement_direction_change_time: [1, 2] # Aktualizuje směr každých 1-2 sekundy
     movement_type: "player_seeking" # "player_seeking" = sleduje hráče
     max_health: 5 # Vydrží 5 hitů
@@ -103,7 +103,7 @@ enemies_config:
     max_count: 5 # Maximální počet na mapě
 
 # Vlny nepřátel (waves)
-# Spawn patterns: "circle" (kolem obrazovky), "left" (zleva doprava), "right" (zprava doleva)
+# Spawn patterns: "circle" (kolem obrazovky), "left" (zleva doprava), "right" (zprava doleva), "corners" (v rozích)
 waves:
   - name: "Torpedo Circle Wave"
     trigger_time: 30 # Kdy se spustí (sekundy od začátku hry)
@@ -139,3 +139,10 @@ waves:
       - type: "crab"
         count: 24
         spawn_pattern: "right"
+  - name: "Prudic Wave"
+    trigger_time: 90
+    repeat_interval: 90
+    enemies:
+      - type: "prudic"
+        count: 4
+        spawn_pattern: "corners"

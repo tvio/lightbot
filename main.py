@@ -103,6 +103,18 @@ for enemy_type_name, EnemyClass in ENEMY_TYPES.items():
         # Nastav MAX_HEALTH z configu, pokud existuje
         if 'max_health' in enemy_cfg:
             EnemyClass.MAX_HEALTH = enemy_cfg['max_health']
+        # Nastav animation_path z configu (pro GIF nebo PNG)
+        if 'animation_path' in enemy_cfg:
+            animation_path = enemy_cfg['animation_path']
+            # Pokud má třída GIF_PATH, použij ho
+            if hasattr(EnemyClass, 'GIF_PATH'):
+                EnemyClass.GIF_PATH = animation_path
+            # Pokud má třída SPRITE_IMAGE_PATH (Prudic), použij ho
+            if hasattr(EnemyClass, 'SPRITE_IMAGE_PATH'):
+                EnemyClass.SPRITE_IMAGE_PATH = animation_path
+        else:
+            # Varování, pokud není animation_path v configu
+            print(f"VAROVANI: {enemy_type_name} nema animation_path v game_config.yaml")
 
 # ============================================================================
 # HUDEBNÍ SYSTÉM
@@ -914,6 +926,8 @@ class Game(arcade.Window):
                 self.spawn_wave_left(enemy_type, count)
             elif pattern == "right":
                 self.spawn_wave_right(enemy_type, count)
+            elif pattern == "corners":
+                self.spawn_wave_corners(enemy_type, count)
     
     def spawn_wave_circle(self, enemy_type, count):
         """Spawn nepřátel v kruhu kolem obrazovky"""
@@ -1054,6 +1068,63 @@ class Game(arcade.Window):
                 enemy.player = self.player
             
             self.enemy_list.append(enemy)
+    
+    def spawn_wave_corners(self, enemy_type, count):
+        """Spawn nepřátel v rozích obrazovky"""
+        EnemyClass = ENEMY_TYPES[enemy_type]
+        margin = EnemyClass.RADIUS + MAX_SPAWN_MARGIN
+        
+        # Definuj 4 rohy
+        corners = [
+            (margin, margin),  # Levý horní
+            (SCREEN_WIDTH - margin, margin),  # Pravý horní
+            (margin, SCREEN_HEIGHT - margin),  # Levý dolní
+            (SCREEN_WIDTH - margin, SCREEN_HEIGHT - margin),  # Pravý dolní
+        ]
+        
+        # Rozděl count rovnoměrně mezi rohy
+        base_count_per_corner = count // 4
+        remainder = count % 4
+        
+        # Spawn nepřátel
+        for corner_idx in range(4):
+            # Počet nepřátel v tomto rohu
+            corner_count = base_count_per_corner
+            if corner_idx < remainder:
+                corner_count += 1
+            
+            corner_x, corner_y = corners[corner_idx]
+            
+            # Spawn nepřátel v tomto rohu
+            for i in range(corner_count):
+                # Pro více nepřátel v rohu, rozmísti je trochu od sebe
+                if corner_count > 1:
+                    # Rozmísti v malém kruhu kolem rohu
+                    angle_offset = (360 / corner_count) * i
+                    angle_rad = math.radians(angle_offset)
+                    offset_distance = EnemyClass.RADIUS * 2
+                    offset_x = offset_distance * math.cos(angle_rad)
+                    offset_y = offset_distance * math.sin(angle_rad)
+                else:
+                    offset_x = 0
+                    offset_y = 0
+                
+                x = corner_x + offset_x
+                y = corner_y + offset_y
+                
+                # Vytvoř nepřítele
+                enemy = EnemyClass(x, y, side_direction=None)
+                
+                # Nastavení pro torpédo
+                if enemy.MOVEMENT_TYPE == "seeking":
+                    enemy.mine_list = self.mine_list
+                    enemy.player = self.player
+                
+                # Nastavení pro Prudic (player_seeking)
+                if enemy.MOVEMENT_TYPE == "player_seeking":
+                    enemy.player = self.player
+                
+                self.enemy_list.append(enemy)
     
     def play_next_song(self):
         """Přehraj další píseň v seznamu (cyklicky)"""

@@ -10,7 +10,7 @@ class Crab(BaseEnemy):
     
     # Konfigurace kraba
     ENEMY_TYPE_NAME = "crab"
-    GIF_PATH = "pict/crab-red.gif"
+    GIF_PATH = None  # Načte se z game_config.yaml
     RADIUS = 15
     SPEED = 1
     ANIMATION_FRAME_DURATION = 0.15

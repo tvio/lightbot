@@ -10,7 +10,7 @@ class Star(BaseEnemy):
     
     # Konfigurace hvěždy
     ENEMY_TYPE_NAME = "star"
-    GIF_PATH = "pict/animated_star_pingpong.gif"
+    GIF_PATH = None  # Načte se z game_config.yaml
     RADIUS = 12
     SPEED = 1  # Hvězda je rychlejší
     ANIMATION_FRAME_DURATION = 0.15  # Hvězda se otáčí pomaleji (50% pomalejší)

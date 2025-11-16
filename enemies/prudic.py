@@ -17,7 +17,7 @@ class Prudic(BaseEnemy):
     ENEMY_TYPE_NAME = "prudic"
     GIF_PATH = None  # Nepoužíváme GIF
     SPRITE_SHEET_PATH = None  # Nepoužíváme sprite sheet
-    SPRITE_IMAGE_PATH = "pict/prudicV4.png"  # Jeden PNG obrázek pro rotaci
+    SPRITE_IMAGE_PATH = None  # Načte se z game_config.yaml
     SPRITE_WIDTH = 0  # Nepoužívá se
     SPRITE_HEIGHT = 0  # Nepoužívá se
     SPRITE_COLUMNS = 1  # Nepoužívá se

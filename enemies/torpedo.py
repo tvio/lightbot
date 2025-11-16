@@ -12,7 +12,7 @@ class Torpedo(BaseEnemy):
     
     # Konfigurace torpéda
     ENEMY_TYPE_NAME = "torpedo"
-    GIF_PATH = "pict/torpedo_thread.gif"
+    GIF_PATH = None  # Načte se z game_config.yaml
     RADIUS = 10
     SPEED = 1.2
     ANIMATION_FRAME_DURATION = 0.12
