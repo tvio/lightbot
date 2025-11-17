@@ -236,14 +236,15 @@ class Game(arcade.Window):
         self.fps_timer = 0
         
         # Hudba
-        self.current_music_index = 0
         self.music_files = MUSIC_FILES
+        # Vyber náhodnou píseň pro start, pak pokračuj v abecedním pořadí
+        self.current_music_index = random.randint(0, len(self.music_files) - 1) if self.music_files else 0
         self.current_song_name = ""
         self.song_name_display_timer = 0  # Timer pro zobrazení názvu (3 sekundy)
         self.song_name_display_duration = 3.0  # 3 sekundy
         self.current_music_player = None  # Aktuální přehrávač hudby
         
-        # Spusť první píseň
+        # Spusť první píseň (náhodně vybranou)
         if self.music_files:
             self.play_next_song()
     
@@ -898,17 +899,18 @@ class Game(arcade.Window):
     def update_waves(self, delta_time):
         """Aktualizuj wave systém - kontrola časů a spouštění vln"""
         for wave in self.waves:
-            # Kontrola, zda je čas spustit vlnu
-            time_since_last = self.game_time - wave['last_trigger']
-            
-            # První spuštění
+            # První spuštění (last_trigger < 0 znamená, že vlna ještě nebyla spuštěna)
             if wave['last_trigger'] < 0 and self.game_time >= wave['trigger_time']:
+                print(f"🌊 Spouštím vlnu '{wave['name']}' (game_time={self.game_time:.2f}, trigger_time={wave['trigger_time']})")
                 self.spawn_wave(wave)
                 wave['last_trigger'] = self.game_time
-            # Opakování
-            elif wave['repeat_interval'] > 0 and time_since_last >= wave['repeat_interval']:
-                self.spawn_wave(wave)
-                wave['last_trigger'] = self.game_time
+            # Opakování (kontroluj, že vlna už byla spuštěna - last_trigger >= 0)
+            elif wave['last_trigger'] >= 0 and wave['repeat_interval'] > 0:
+                time_since_last = self.game_time - wave['last_trigger']
+                if time_since_last >= wave['repeat_interval']:
+                    print(f"🔄 Opakuji vlnu '{wave['name']}' (game_time={self.game_time:.2f}, time_since_last={time_since_last:.2f})")
+                    self.spawn_wave(wave)
+                    wave['last_trigger'] = self.game_time
     
     def spawn_wave(self, wave):
         """Spusť vlnu - spawn všech nepřátel z vlny"""

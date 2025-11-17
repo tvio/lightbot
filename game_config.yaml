@@ -106,7 +106,7 @@ enemies_config:
 # Spawn patterns: "circle" (kolem obrazovky), "left" (zleva doprava), "right" (zprava doleva), "corners" (v rozích)
 waves:
   - name: "Torpedo Circle Wave"
-    trigger_time: 30 # Kdy se spustí (sekundy od začátku hry)
+    trigger_time: 0 # Kdy se spustí (sekundy od začátku hry)
     repeat_interval: 30 # Jak často se opakuje (sekundy), 0 = neopakuje se
     enemies:
       - type: "torpedo"
@@ -114,15 +114,21 @@ waves:
         spawn_pattern: "circle"
 
   - name: "Star Left Wave"
-    trigger_time: 30
+    trigger_time: 0
     repeat_interval: 30
     enemies:
       - type: "star"
         count: 20
         spawn_pattern: "left"
-
+  - name: "Star Right Wave"
+    trigger_time: 30
+    repeat_interval: 30
+    enemies:
+      - type: "star"
+        count: 20
+        spawn_pattern: "right"
   - name: "Mixed Circle Wave"
-    trigger_time: 60
+    trigger_time: 0
     repeat_interval: 45
     enemies:
       - type: "star"
@@ -133,14 +139,14 @@ waves:
         spawn_pattern: "circle"
 
   - name: "Crab Right Wave"
-    trigger_time: 45
-    repeat_interval: 35
+    trigger_time: 0
+    repeat_interval: 30
     enemies:
       - type: "crab"
         count: 24
         spawn_pattern: "right"
   - name: "Prudic Wave"
-    trigger_time: 90
+    trigger_time: 110
     repeat_interval: 90
     enemies:
       - type: "prudic"
