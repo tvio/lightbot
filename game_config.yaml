@@ -41,7 +41,7 @@ light_bomb:
 day_night:
   day_length: 30.0
   night_length: 30.0
-  start_with_day: false # true = začne dnem, false = začne nocí
+  start_with_day: true # true = začne dnem, false = začne nocí
   day_background_color: [56, 53, 48]
   night_background_color: [0, 0, 0]
 

@@ -220,19 +220,19 @@ class Torpedo(BaseEnemy):
                 self.current_frame = (self.current_frame + 1) % len(self.animation_textures)
                 self.texture = self.animation_textures[self.current_frame]
         
-        # Pokud exploduje, použij základní logiku
+        # Pokud exploduje, blikej a zmiz
         if self.exploding:
             self.explode_timer += delta_time
             
-            # Blikání (každých 0.1s)
-            if int(self.explode_timer * 10) % 2 == 0:
+            # Blikání (každých 0.05s - rychlejší)
+            if int(self.explode_timer * 20) % 2 == 0:
                 self.visible = True
             else:
                 self.visible = False
             
-            # Po 1s zmiz
-            if self.explode_timer > 1.0:
-                self.kill()
+            # Po 0.3s zmiz
+            if self.explode_timer > 0.5:
+                self.remove_from_sprite_lists()
             return
         
         # Aktualizuj vyhledávací chování

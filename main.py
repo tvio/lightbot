@@ -226,13 +226,8 @@ class Game(arcade.Window):
         # Spawn timery pro každého nepřítele samostatně
         self.enemy_spawn_timers = {}
         for enemy_type in ENEMY_TYPES.keys():
-            enemy_config = ENEMY_CONFIG[enemy_type]
-            # Pokud má start_time 0, začni s timerem na 0 (spawn hned)
-            # Jinak začni s timerem na spawn_time (spawn po spawn_time sekundách od start_time)
-            if enemy_config.get('start_time', 0) == 0:
-                self.enemy_spawn_timers[enemy_type] = 0
-            else:
-                self.enemy_spawn_timers[enemy_type] = enemy_config['spawn_time']
+            # Timer vždy začíná na 0 - první spawn nastane hned jakmile game_time >= start_time
+            self.enemy_spawn_timers[enemy_type] = 0
         
         # Celkový čas hry (pro start_time)
         self.game_time = 0
@@ -936,12 +931,8 @@ class Game(arcade.Window):
         
         # Reset spawn timerů pro každého nepřítele
         for enemy_type in ENEMY_TYPES.keys():
-            enemy_config = ENEMY_CONFIG[enemy_type]
-            # Pokud má start_time 0, začni s timerem na 0 (spawn hned)
-            if enemy_config.get('start_time', 0) == 0:
-                self.enemy_spawn_timers[enemy_type] = 0
-            else:
-                self.enemy_spawn_timers[enemy_type] = enemy_config['spawn_time']
+            # Timer vždy začíná na 0 - první spawn nastane hned jakmile game_time >= start_time
+            self.enemy_spawn_timers[enemy_type] = 0
         
         # Reset herního času
         self.game_time = 0

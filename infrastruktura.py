@@ -154,19 +154,19 @@ def find_laser_collision_with_enemies(
     debug: bool = False
 ) -> Tuple[bool, float, float, Optional[arcade.Sprite]]:
     """
-    Najde nejbližší kolizi laseru s nepřáteli pomocí Arcade collision detection.
+    Najde nejbližší kolizi laseru s nepřáteli pomocí matematického výpočtu průsečíku přímky s kruhem.
     
     Args:
         laser_start_x, laser_start_y: Začátek laseru
         laser_end_x, laser_end_y: Konec laseru
         enemy_list: SpriteList s nepřáteli
-        enemy_radius: Poloměr nepřítele (pro správný výpočet kolize)
+        enemy_radius: Poloměr nepřítele (fallback)
         debug: Pokud True, vypisuj debug informace
     
     Returns:
         Tuple (hit, collision_x, collision_y, enemy_sprite) nebo (False, 0, 0, None)
     """
-    # Vzdálenost laseru
+    # Směrový vektor laseru
     dx = laser_end_x - laser_start_x
     dy = laser_end_y - laser_start_y
     laser_length = math.sqrt(dx * dx + dy * dy)
@@ -174,76 +174,58 @@ def find_laser_collision_with_enemies(
     if laser_length < 1:
         return False, 0, 0, None
     
-    # Počet kontrolních bodů podél laseru (každých 10 pixelů)
-    check_spacing = 10
-    num_checks = max(1, int(laser_length / check_spacing))
-    
-    if debug:
-        print(f"[DEBUG collision] Checking {num_checks} points along laser length {laser_length:.1f}")
+    # Normalizovaný směrový vektor
+    dir_x = dx / laser_length
+    dir_y = dy / laser_length
     
     closest_hit = None
-    closest_distance = laser_length
+    closest_t = laser_length  # Parametr t pro nejbližší průsečík
     
-    # Vytvoř jeden kontrolní sprite (reuse pro výkon)
-    check_sprite = arcade.SpriteSolidColor(20, 20, arcade.color.WHITE)
-    check_sprite.alpha = 0  # Neviditelný
-    
-    # Zkontroluj každý kontrolní bod
-    for i in range(num_checks + 1):
-        # Pozice kontrolního bodu
-        t = i / num_checks if num_checks > 0 else 0
-        check_x = laser_start_x + dx * t
-        check_y = laser_start_y + dy * t
+    for enemy in enemy_list:
+        if hasattr(enemy, 'exploding') and enemy.exploding:
+            continue
         
-        # Použij existující sprite a jen změň pozici (rychlejší)
-        check_sprite.center_x = check_x
-        check_sprite.center_y = check_y
+        # Vizuální poloměr nepřítele (RADIUS * SCALE_MULTIPLIER)
+        base_radius = getattr(enemy, 'RADIUS', enemy_radius)
+        scale_multiplier = getattr(enemy, 'SCALE_MULTIPLIER', 1)
+        visual_radius = base_radius * scale_multiplier
         
-        # Zkontroluj kolizi s nepřáteli
-        hit_enemies = arcade.check_for_collision_with_list(check_sprite, enemy_list)
+        # Vektor od začátku laseru k středu nepřítele
+        to_enemy_x = enemy.center_x - laser_start_x
+        to_enemy_y = enemy.center_y - laser_start_y
         
-        if hit_enemies:
-            if debug:
-                print(f"[DEBUG collision] Point {i} at ({check_x:.1f}, {check_y:.1f}) hit {len(hit_enemies)} enemy/enemies")
-            # Najdi nejbližšího nepřítele
-            for enemy in hit_enemies:
-                if hasattr(enemy, 'exploding') and enemy.exploding:
-                    if debug:
-                        print(f"  Enemy at ({enemy.center_x:.1f}, {enemy.center_y:.1f}) is exploding, skipping")
-                    continue
-                
-                # Vzdálenost od začátku laseru
-                dist = math.sqrt((check_x - laser_start_x)**2 + (check_y - laser_start_y)**2)
-                
-                if debug:
-                    print(f"  Checking enemy at ({enemy.center_x:.1f}, {enemy.center_y:.1f}), dist={dist:.1f}, closest={closest_distance:.1f}")
-                
-                if dist < closest_distance:
-                    closest_distance = dist
-                    # Pozice kolize - pozice nepřítele směrem k laseru
-                    to_start_dx = laser_start_x - enemy.center_x
-                    to_start_dy = laser_start_y - enemy.center_y
-                    to_start_len = math.sqrt(to_start_dx**2 + to_start_dy**2)
-                    
-                    # Použij VIZUÁLNÍ poloměr nepřítele (RADIUS * SCALE_MULTIPLIER)
-                    # To zajistí, že laser končí na vizuálním okraji spritu
-                    base_radius = getattr(enemy, 'RADIUS', enemy_radius)
-                    scale_multiplier = getattr(enemy, 'SCALE_MULTIPLIER', 1)
-                    visual_radius = base_radius * scale_multiplier
-                    
-                    if to_start_len > 0:
-                        # Normalizuj a posuň o vizuální poloměr nepřítele
-                        to_start_dx /= to_start_len
-                        to_start_dy /= to_start_len
-                        collision_x = enemy.center_x + to_start_dx * visual_radius
-                        collision_y = enemy.center_y + to_start_dy * visual_radius
-                    else:
-                        collision_x = enemy.center_x
-                        collision_y = enemy.center_y
-                    
-                    if debug:
-                        print(f"  NEW CLOSEST HIT! collision at ({collision_x:.1f}, {collision_y:.1f})")
+        # Projekce na směr laseru (nejbližší bod na přímce k nepříteli)
+        t_closest = to_enemy_x * dir_x + to_enemy_y * dir_y
+        
+        # Nejbližší bod na přímce laseru
+        closest_x = laser_start_x + t_closest * dir_x
+        closest_y = laser_start_y + t_closest * dir_y
+        
+        # Vzdálenost od nejbližšího bodu k středu nepřítele
+        dist_to_center = math.sqrt(
+            (closest_x - enemy.center_x) ** 2 + 
+            (closest_y - enemy.center_y) ** 2
+        )
+        
+        # Pokud je vzdálenost menší než poloměr, laser protíná kruh
+        if dist_to_center <= visual_radius:
+            # Vypočítej přesný bod průsečíku (vstupní bod do kruhu)
+            # Použijeme Pythagorovu větu: half_chord = sqrt(r² - d²)
+            half_chord = math.sqrt(visual_radius ** 2 - dist_to_center ** 2)
+            
+            # Bod vstupu laseru do kruhu (bližší průsečík)
+            t_hit = t_closest - half_chord
+            
+            # Kontrola, že průsečík je na úsečce laseru (t >= 0 a t <= laser_length)
+            if t_hit >= 0 and t_hit <= laser_length:
+                if t_hit < closest_t:
+                    closest_t = t_hit
+                    collision_x = laser_start_x + t_hit * dir_x
+                    collision_y = laser_start_y + t_hit * dir_y
                     closest_hit = (collision_x, collision_y, enemy)
+                    
+                    if debug:
+                        print(f"[DEBUG] Hit {enemy.ENEMY_TYPE_NAME} at ({collision_x:.1f}, {collision_y:.1f}), t={t_hit:.1f}, visual_radius={visual_radius}")
     
     if closest_hit:
         return True, closest_hit[0], closest_hit[1], closest_hit[2]

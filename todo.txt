@@ -1,3 +1,4 @@
+Negunhuje prvni spawn time enymyho
 Stale strelba do prudice na stred
 Wave udelat od trigger time, to nefunguje + start
 
