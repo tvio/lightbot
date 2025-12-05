@@ -66,6 +66,10 @@ SHOCKWAVE_RADIUS = CONFIG['shockwave']['radius']
 SHOCKWAVE_ANIMATION_DURATION = CONFIG['shockwave']['animation_duration']
 SHOCKWAVE_COLOR = tuple(CONFIG['shockwave']['wave_color'])
 
+LIGHT_BOMB_STARTING_COUNT = CONFIG['light_bomb']['starting_count']
+LIGHT_BOMB_ANIMATION_DURATION = CONFIG['light_bomb']['animation_duration']
+LIGHT_BOMB_COLOR = tuple(CONFIG['light_bomb']['wave_color'])
+
 DAY_LENGTH = CONFIG['day_night']['day_length']
 NIGHT_LENGTH = CONFIG['day_night']['night_length']
 START_WITH_DAY = CONFIG['day_night']['start_with_day']
@@ -210,6 +214,12 @@ class Game(arcade.Window):
         self.shockwave_timer = 0
         self.shockwave_radius_current = 0
         
+        # Světelná atomová bomba
+        self.light_bomb_count = LIGHT_BOMB_STARTING_COUNT
+        self.light_bomb_active = False
+        self.light_bomb_timer = 0
+        self.light_bomb_radius_current = 0
+        
         # Nepřátelé
         self.enemy_list = arcade.SpriteList(use_spatial_hash=False)
         
@@ -336,6 +346,16 @@ class Game(arcade.Window):
                 3
             )
         
+        # Vykresli light bomb animaci (velká vlna ze středu)
+        if self.light_bomb_active and not self.player.game_over:
+            arcade.draw_circle_outline(
+                self.player.center_x,
+                self.player.center_y,
+                self.light_bomb_radius_current,
+                LIGHT_BOMB_COLOR,
+                5
+            )
+        
         # Vykresli banner podle dne/noci
         if self.is_day:
             self.draw_cannon_bar()
@@ -347,6 +367,9 @@ class Game(arcade.Window):
         
         # Vykresli skóre
         self.vykresli_skore()
+        
+        # Vykresli počet světelných bomb (nahoře vlevo)
+        self.draw_light_bomb_count()
         
         # Zobraz FPS
         if not hasattr(self, 'fps_text'):
@@ -497,6 +520,28 @@ class Game(arcade.Window):
             anchor_y="center"
         )
     
+    def draw_light_bomb_count(self):
+        """Vykreslí počet světelných bomb nahoře vlevo"""
+        text_x = 10
+        text_y = SCREEN_HEIGHT - 70  # Pod FPS
+        
+        bomb_text = f"Světelná bomba: {self.light_bomb_count}"
+        
+        # Barva podle dostupnosti (zlatá pokud máš, šedá pokud ne)
+        if self.light_bomb_count > 0:
+            text_color = LIGHT_BOMB_COLOR
+        else:
+            text_color = (100, 100, 100)
+        
+        arcade.draw_text(
+            bomb_text,
+            text_x, text_y,
+            text_color,
+            16,
+            anchor_x="left",
+            anchor_y="center"
+        )
+    
     def update_laser_position(self):
         """Vypočítá pozice laseru a kolize"""
         angle_rad = math.radians(self.cannon_angle)
@@ -640,6 +685,37 @@ class Game(arcade.Window):
             if self.shockwave_timer >= SHOCKWAVE_ANIMATION_DURATION:
                 self.shockwave_active = False
                 self.shockwave_timer = 0
+        
+        # Aktualizuj light bomb animaci (světelná atomová bomba)
+        if self.light_bomb_active:
+            self.light_bomb_timer += delta_time
+            # Expanze vlny přes celou obrazovku
+            progress = self.light_bomb_timer / LIGHT_BOMB_ANIMATION_DURATION
+            # Maximální poloměr = diagonála obrazovky (aby dosáhla do všech rohů)
+            max_radius = math.sqrt(SCREEN_WIDTH ** 2 + SCREEN_HEIGHT ** 2)
+            self.light_bomb_radius_current = max_radius * progress
+            
+            # Zniči všechny nepřátele, které vlna zasáhne
+            for enemy in self.enemy_list:
+                if enemy.exploding:
+                    continue
+                
+                # Vzdálenost od hráče (mezi středy)
+                dx = enemy.center_x - self.player.center_x
+                dy = enemy.center_y - self.player.center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                
+                # Pokud okraj vlny dosáhne okraje nepřítele, zničit ho
+                if distance <= self.light_bomb_radius_current + enemy.RADIUS:
+                    # Instakill - udělí damage = max_health
+                    damage = getattr(enemy, 'MAX_HEALTH', 1)
+                    if enemy.take_damage(damage):
+                        self.score += 1
+            
+            # Konec animace
+            if self.light_bomb_timer >= LIGHT_BOMB_ANIMATION_DURATION:
+                self.light_bomb_active = False
+                self.light_bomb_timer = 0
         
         # Aktualizuj celkový čas hry
         self.game_time += delta_time
@@ -831,6 +907,15 @@ class Game(arcade.Window):
             self.shockwave_radius_current = 0
             self.player.shockwave_charges -= 1
     
+    def activate_light_bomb(self):
+        """Aktivuje světelnou atomovou bombu (zničí všechny nepřátele)"""
+        if self.light_bomb_count > 0 and not self.light_bomb_active:
+            self.light_bomb_active = True
+            self.light_bomb_timer = 0
+            self.light_bomb_radius_current = 0
+            self.light_bomb_count -= 1
+            print("💥 SVĚTELNÁ ATOMOVÁ BOMBA AKTIVOVÁNA!")
+    
     def restart_game(self):
         """Restart hry"""
         self.player.center_x = SCREEN_WIDTH // 2
@@ -838,6 +923,11 @@ class Game(arcade.Window):
         self.player.game_over = False
         self.player.explode_timer = 0
         self.player.shockwave_charges = SHOCKWAVE_MAX_CHARGES
+        
+        # Reset světelné atomové bomby
+        self.light_bomb_count = LIGHT_BOMB_STARTING_COUNT
+        self.light_bomb_active = False
+        self.light_bomb_timer = 0
         
         self.score = 0
         
@@ -1212,6 +1302,9 @@ class Game(arcade.Window):
             self.rotate_left = True
         elif key == arcade.key.D or key == arcade.key.RIGHT:
             self.rotate_right = True
+        elif key == arcade.key.Q:
+            # Světelná atomová bomba
+            self.activate_light_bomb()
     
     def on_key_release(self, key, modifiers):
         """Uvolnění klávesy"""

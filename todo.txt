@@ -1,3 +1,4 @@
+Stale strelba do prudice na stred
 Wave udelat od trigger time, to nefunguje + start
 
 Prudic spatne reaguje na shockwave

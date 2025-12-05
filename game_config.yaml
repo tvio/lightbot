@@ -31,6 +31,12 @@ shockwave:
   animation_duration: 0.2 # Jak dlouho trvá animace vlny (sekundy)
   wave_color: [255, 255, 255] # Barva vlny
 
+# Světelná atomová bomba (ultimátní zbraň)
+light_bomb:
+  starting_count: 1 # Kolik bomb má hráč na začátku
+  animation_duration: 1.0 # Jak dlouho trvá animace vlny (sekundy)
+  wave_color: [255, 255, 0] # Barva vlny (zlatá)
+
 # Den/Noc cyklus
 day_night:
   day_length: 30.0
@@ -98,7 +104,7 @@ enemies_config:
     movement_direction_change_time: [1, 2] # Aktualizuje směr každých 1-2 sekundy
     movement_type: "player_seeking" # "player_seeking" = sleduje hráče
     max_health: 5 # Vydrží 5 hitů
-    start_time: 0 # Kdy začne spawovat (sekundy od začátku hry)
+    start_time: 10 # Kdy začne spawovat (sekundy od začátku hry)
     spawn_time: 30 # Jak často se spawnuje (sekundy)
     max_count: 5 # Maximální počet na mapě
 

@@ -225,12 +225,18 @@ def find_laser_collision_with_enemies(
                     to_start_dy = laser_start_y - enemy.center_y
                     to_start_len = math.sqrt(to_start_dx**2 + to_start_dy**2)
                     
+                    # Použij VIZUÁLNÍ poloměr nepřítele (RADIUS * SCALE_MULTIPLIER)
+                    # To zajistí, že laser končí na vizuálním okraji spritu
+                    base_radius = getattr(enemy, 'RADIUS', enemy_radius)
+                    scale_multiplier = getattr(enemy, 'SCALE_MULTIPLIER', 1)
+                    visual_radius = base_radius * scale_multiplier
+                    
                     if to_start_len > 0:
-                        # Normalizuj a posuň o poloměr nepřítele
+                        # Normalizuj a posuň o vizuální poloměr nepřítele
                         to_start_dx /= to_start_len
                         to_start_dy /= to_start_len
-                        collision_x = enemy.center_x + to_start_dx * enemy_radius
-                        collision_y = enemy.center_y + to_start_dy * enemy_radius
+                        collision_x = enemy.center_x + to_start_dx * visual_radius
+                        collision_y = enemy.center_y + to_start_dy * visual_radius
                     else:
                         collision_x = enemy.center_x
                         collision_y = enemy.center_y
