@@ -29,12 +29,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
-__pycache__/infrastruktura.cpython-313.pyc
-__pycache__/player.cpython-313.pyc
-enemies/__pycache__/__init__.cpython-313.pyc
-enemies/__pycache__/base_enemy.cpython-313.pyc
-enemies/__pycache__/crab.cpython-313.pyc
-enemies/__pycache__/prudic.cpython-313.pyc
-enemies/__pycache__/star.cpython-313.pyc
-enemies/__pycache__/torpedo.cpython-313.pyc
+
 
