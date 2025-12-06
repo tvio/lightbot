@@ -222,3 +222,81 @@ class BonusShockwave(arcade.Sprite):
         self.lifetime -= delta_time
         if self.lifetime <= 0:
             self.remove_from_sprite_lists()
+
+
+class BonusKanon(arcade.Sprite):
+    """Bonus - přidá druhý kanon"""
+    
+    BONUS_TYPE = "kanon"
+    RADIUS = 30
+    
+    def __init__(self, x: float, y: float):
+        """
+        Inicializuj bonus
+        
+        Args:
+            x, y: Pozice bonusu
+        """
+        # Načti texturu z PNG
+        try:
+            super().__init__("pict/bonus_kanon.png", center_x=x, center_y=y)
+            # Škáluj na správnou velikost
+            if self.texture.width > 0:
+                self.scale = (self.RADIUS * 2) / max(self.texture.width, self.texture.height)
+        except Exception as e:
+            print(f"CHYBA: Nelze načíst bonus_kanon.png: {e}")
+            # Fallback - oranžový kruh
+            bonus_texture = arcade.make_soft_circle_texture(
+                self.RADIUS * 2,
+                arcade.color.ORANGE,
+                outer_alpha=255
+            )
+            super().__init__(bonus_texture, center_x=x, center_y=y)
+        
+        # Životnost bonusu (zmizí po 10 sekundách)
+        self.lifetime = 10.0
+    
+    def update(self, delta_time: float = 1/60):
+        """Update bonusu - životnost"""
+        self.lifetime -= delta_time
+        if self.lifetime <= 0:
+            self.remove_from_sprite_lists()
+
+
+class BonusZivot(arcade.Sprite):
+    """Bonus - přidá extra život"""
+    
+    BONUS_TYPE = "zivot"
+    RADIUS = 30
+    
+    def __init__(self, x: float, y: float):
+        """
+        Inicializuj bonus
+        
+        Args:
+            x, y: Pozice bonusu
+        """
+        # Načti texturu z PNG
+        try:
+            super().__init__("pict/bonus_extra_zivot.png", center_x=x, center_y=y)
+            # Škáluj na správnou velikost
+            if self.texture.width > 0:
+                self.scale = (self.RADIUS * 2) / max(self.texture.width, self.texture.height)
+        except Exception as e:
+            print(f"CHYBA: Nelze načíst bonus_extra_zivot.png: {e}")
+            # Fallback - červený kruh
+            bonus_texture = arcade.make_soft_circle_texture(
+                self.RADIUS * 2,
+                arcade.color.RED,
+                outer_alpha=255
+            )
+            super().__init__(bonus_texture, center_x=x, center_y=y)
+        
+        # Životnost bonusu (zmizí po 10 sekundách)
+        self.lifetime = 10.0
+    
+    def update(self, delta_time: float = 1/60):
+        """Update bonusu - životnost"""
+        self.lifetime -= delta_time
+        if self.lifetime <= 0:
+            self.remove_from_sprite_lists()
