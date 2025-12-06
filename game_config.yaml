@@ -42,7 +42,7 @@ day_night:
   day_length: 30.0
   night_length: 30.0
   start_with_day: true # true = začne dnem, false = začne nocí
-  day_background_color: [56, 53, 48]
+  day_background_color: [20, 20, 20]
   night_background_color: [0, 0, 0]
 
 # Miny
@@ -107,6 +107,20 @@ enemies_config:
     start_time: 10 # Kdy začne spawovat (sekundy od začátku hry)
     spawn_time: 30 # Jak často se spawnuje (sekundy)
     max_count: 5 # Maximální počet na mapě
+
+  ufo:
+    radius: 15
+    speed: 4 # Vysoká rychlost
+    animation_path: "pict/ufo.gif"
+    animation_frame_duration: 0.1
+    scale_multiplier: 2
+    movement_direction_change_time: [0, 0] # Nemění směr
+    movement_type: "flythrough" # "flythrough" = letí přes obrazovku a zmizí
+    max_health: 1
+    start_time: 1 # Kdy začne spawovat (sekundy od začátku hry)
+    spawn_time: 15 # Jak často se spawnuje (sekundy)
+    max_count: 1 # Maximální počet na mapě
+    drops_bonus: true # Při zničení nechá bonus
 
 # Vlny nepřátel (waves)
 # Spawn patterns: "circle" (kolem obrazovky), "left" (zleva doprava), "right" (zprava doleva), "corners" (v rozích)

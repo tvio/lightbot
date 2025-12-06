@@ -13,10 +13,10 @@ import glob
 from typing import Tuple, Optional
 
 # Import modulů
-from player import Player, Mine
+from player import Player, Mine, BonusBomba, BonusMiny, BonusShockwave
 from infrastruktura import find_laser_collision_with_enemies, calculate_laser_end
 from enemies.base_enemy import BaseEnemy
-from enemies import Crab, Star, Torpedo, Prudic
+from enemies import Crab, Star, Torpedo, Prudic, Ufo
 
 # ============================================================================
 # KONFIGURAČNÍ KONSTANTY (z game_config.yaml)
@@ -90,6 +90,7 @@ ENEMY_TYPES = {
     'star': Star,
     'torpedo': Torpedo,
     'prudic': Prudic,
+    'ufo': Ufo,
 }
 ENEMY_CONFIG = CONFIG['enemies_config']
 
@@ -213,6 +214,7 @@ class Game(arcade.Window):
         self.shockwave_active = False
         self.shockwave_timer = 0
         self.shockwave_radius_current = 0
+        self.shockwave_hit_enemies = set()  # Nepřátelé zasažení touto vlnou (aby každý dostal damage jen jednou)
         
         # Světelná atomová bomba
         self.light_bomb_count = LIGHT_BOMB_STARTING_COUNT
@@ -222,6 +224,12 @@ class Game(arcade.Window):
         
         # Nepřátelé
         self.enemy_list = arcade.SpriteList(use_spatial_hash=False)
+        
+        # Bonusy (padají z UFO)
+        self.bonus_list = arcade.SpriteList(use_spatial_hash=False)
+        self.collected_bonus_types = set()  # Typy bonusů, které hráč už sebral (nemohou znovu padnout)
+        self.current_max_mines = MAX_MINES  # Aktuální max počet min (může se zvýšit bonusem)
+        self.current_shockwave_radius = SHOCKWAVE_RADIUS  # Aktuální poloměr shockwave (může se zvýšit bonusem)
         
         # Spawn timery pro každého nepřítele samostatně
         self.enemy_spawn_timers = {}
@@ -265,6 +273,9 @@ class Game(arcade.Window):
         
         # Vykresli miny
         self.mine_list.draw()
+        
+        # Vykresli bonusy
+        self.bonus_list.draw()
         
         # Vykresli blikající červené středy min
         blink_on = (self.blink_timer % 1.0) < 0.5
@@ -338,7 +349,7 @@ class Game(arcade.Window):
                 self.player.center_y,
                 self.shockwave_radius_current,
                 SHOCKWAVE_COLOR,
-                3
+                5  # Tloušťka kruhu (mírně zvětšeno)
             )
         
         # Vykresli light bomb animaci (velká vlna ze středu)
@@ -348,7 +359,7 @@ class Game(arcade.Window):
                 self.player.center_y,
                 self.light_bomb_radius_current,
                 LIGHT_BOMB_COLOR,
-                5
+                20  # Tloušťka kruhu - více hrozivé
             )
         
         # Vykresli banner podle dne/noci
@@ -571,9 +582,10 @@ class Game(arcade.Window):
         if hit and hit_enemy:
             self.laser_end_x = collision_x
             self.laser_end_y = collision_y
-            # Udeř nepřítele (pokud zemře, přidej skóre)
+            # Udeř nepřítele (pokud zemře, přidej skóre a bonus)
             if hit_enemy.take_damage(1):
                 self.score += 1
+                self.spawn_bonus_from_enemy(hit_enemy)
         else:
             self.laser_end_x = screen_end_x
             self.laser_end_y = screen_end_y
@@ -654,13 +666,17 @@ class Game(arcade.Window):
         # Aktualizuj shockwave animaci
         if self.shockwave_active:
             self.shockwave_timer += delta_time
-            # Expanze vlny
+            # Expanze vlny (používá current_shockwave_radius, který může být zvětšen bonusem)
             progress = self.shockwave_timer / SHOCKWAVE_ANIMATION_DURATION
-            self.shockwave_radius_current = SHOCKWAVE_RADIUS * progress
+            self.shockwave_radius_current = self.current_shockwave_radius * progress
             
             # Kontrola kolize s nepřáteli
             for enemy in self.enemy_list:
                 if enemy.exploding:
+                    continue
+                
+                # Přeskoč nepřátele, kteří už byli zasaženi touto vlnou
+                if id(enemy) in self.shockwave_hit_enemies:
                     continue
                 
                 # Vzdálenost od hráče (mezi středy)
@@ -668,18 +684,25 @@ class Game(arcade.Window):
                 dy = enemy.center_y - self.player.center_y
                 distance = math.sqrt(dx * dx + dy * dy)
                 
+                # Použij VIZUÁLNÍ poloměr nepřítele (RADIUS * SCALE_MULTIPLIER)
+                visual_radius = enemy.RADIUS * getattr(enemy, 'SCALE_MULTIPLIER', 1)
+                
                 # Pokud okraj vlny dosáhne okraje nepřítele, zničit ho
                 # distance = vzdálenost mezi středy
                 # Pro kolizi: okraj vlny >= okraj nepřítele
-                if distance <= self.shockwave_radius_current + enemy.RADIUS:
-                    # Udeř nepřítele (pokud zemře, přidej skóre)
+                if distance <= self.shockwave_radius_current + visual_radius:
+                    # Označ nepřítele jako zasaženého touto vlnou
+                    self.shockwave_hit_enemies.add(id(enemy))
+                    # Udeř nepřítele (pokud zemře, přidej skóre a bonus)
                     if enemy.take_damage(1):
                         self.score += 1
+                        self.spawn_bonus_from_enemy(enemy)
             
             # Konec animace
             if self.shockwave_timer >= SHOCKWAVE_ANIMATION_DURATION:
                 self.shockwave_active = False
                 self.shockwave_timer = 0
+                self.shockwave_hit_enemies.clear()  # Reset pro další vlnu
         
         # Aktualizuj light bomb animaci (světelná atomová bomba)
         if self.light_bomb_active:
@@ -700,12 +723,16 @@ class Game(arcade.Window):
                 dy = enemy.center_y - self.player.center_y
                 distance = math.sqrt(dx * dx + dy * dy)
                 
+                # Použij VIZUÁLNÍ poloměr nepřítele (RADIUS * SCALE_MULTIPLIER)
+                visual_radius = enemy.RADIUS * getattr(enemy, 'SCALE_MULTIPLIER', 1)
+                
                 # Pokud okraj vlny dosáhne okraje nepřítele, zničit ho
-                if distance <= self.light_bomb_radius_current + enemy.RADIUS:
+                if distance <= self.light_bomb_radius_current + visual_radius:
                     # Instakill - udělí damage = max_health
                     damage = getattr(enemy, 'MAX_HEALTH', 1)
                     if enemy.take_damage(damage):
                         self.score += 1
+                        self.spawn_bonus_from_enemy(enemy)
             
             # Konec animace
             if self.light_bomb_timer >= LIGHT_BOMB_ANIMATION_DURATION:
@@ -738,6 +765,34 @@ class Game(arcade.Window):
         # Update nepřátel
         self.enemy_list.update(delta_time)
         
+        # Update bonusů
+        self.bonus_list.update(delta_time)
+        
+        # Kolize hráče s bonusy
+        if not self.player.game_over:
+            collected_bonuses = arcade.check_for_collision_with_list(self.player, self.bonus_list)
+            for bonus in collected_bonuses:
+                bonus_type = getattr(bonus, 'BONUS_TYPE', 'unknown')
+                
+                if bonus_type == "bomba":
+                    # Přidej náboj do světelné bomby
+                    self.light_bomb_count += 1
+                    print(f"💣 Bonus sebrán! Světelné bomby: {self.light_bomb_count}")
+                
+                elif bonus_type == "miny":
+                    # Zdvojnásob maximální počet min
+                    self.current_max_mines *= 2
+                    self.collected_bonus_types.add("miny")  # Označ jako sebraný
+                    print(f"💣 Bonus sebrán! Max min: {self.current_max_mines}")
+                
+                elif bonus_type == "shockwave":
+                    # Zdvojnásob poloměr shockwave
+                    self.current_shockwave_radius *= 2
+                    self.collected_bonus_types.add("shockwave")  # Označ jako sebraný
+                    print(f"💣 Bonus sebrán! Shockwave radius: {self.current_shockwave_radius}")
+                
+                bonus.remove_from_sprite_lists()
+        
         # Kolize nepřátel s minami
         enemies_to_remove = []
         mines_to_remove = []
@@ -749,10 +804,11 @@ class Game(arcade.Window):
             hit_mines = arcade.check_for_collision_with_list(enemy, self.mine_list)
             
             if hit_mines:
-                # Udeř nepřítele (pokud zemře, odstraň ho)
+                # Udeř nepřítele (pokud zemře, odstraň ho a bonus)
                 if enemy.take_damage(1):
                     enemies_to_remove.append(enemy)
                     self.score += 1
+                    self.spawn_bonus_from_enemy(enemy)
                 
                 # Odstraň miny (jen pokud nepřítel zemřel, jinak jen poškození)
                 if enemy.health <= 0:
@@ -818,6 +874,11 @@ class Game(arcade.Window):
             enemy_type = random.choice(list(ENEMY_TYPES.keys()))
         
         EnemyClass = ENEMY_TYPES[enemy_type]
+        
+        # Speciální spawn pro UFO (flythrough) - letí přes obrazovku
+        if EnemyClass.MOVEMENT_TYPE == "flythrough":
+            self.spawn_ufo(EnemyClass)
+            return
         
         # Vyber náhodný okraj
         edge = random.randint(0, 3)
@@ -894,13 +955,82 @@ class Game(arcade.Window):
         
         self.enemy_list.append(enemy)
     
+    def spawn_ufo(self, EnemyClass):
+        """Spawn UFO - letí přes obrazovku v náhodném směru
+        
+        Dráha je 10-30% od středu obrazovky (ne úplně v kraji ani ve středu)
+        """
+        margin = EnemyClass.RADIUS * EnemyClass.SCALE_MULTIPLIER + 50
+        
+        # Vyber náhodný okraj pro start (0=horní, 1=pravý, 2=dolní, 3=levý)
+        start_edge = random.randint(0, 3)
+        
+        # Offset od středu (10-30% od středu obrazovky)
+        offset_percent = random.uniform(0.1, 0.3)
+        offset_direction = random.choice([-1, 1])  # Nahoře/dole nebo vlevo/vpravo od středu
+        
+        if start_edge == 0:  # Start nahoře
+            # X pozice: střed + offset
+            x = SCREEN_WIDTH // 2 + offset_direction * offset_percent * SCREEN_WIDTH // 2
+            y = SCREEN_HEIGHT + margin
+            # Cíl: dole (opačná strana)
+            target_x = SCREEN_WIDTH // 2 - offset_direction * offset_percent * SCREEN_WIDTH // 2
+            target_y = -margin
+        elif start_edge == 1:  # Start vpravo
+            x = SCREEN_WIDTH + margin
+            y = SCREEN_HEIGHT // 2 + offset_direction * offset_percent * SCREEN_HEIGHT // 2
+            # Cíl: vlevo
+            target_x = -margin
+            target_y = SCREEN_HEIGHT // 2 - offset_direction * offset_percent * SCREEN_HEIGHT // 2
+        elif start_edge == 2:  # Start dole
+            x = SCREEN_WIDTH // 2 + offset_direction * offset_percent * SCREEN_WIDTH // 2
+            y = -margin
+            # Cíl: nahoře
+            target_x = SCREEN_WIDTH // 2 - offset_direction * offset_percent * SCREEN_WIDTH // 2
+            target_y = SCREEN_HEIGHT + margin
+        else:  # Start vlevo
+            x = -margin
+            y = SCREEN_HEIGHT // 2 + offset_direction * offset_percent * SCREEN_HEIGHT // 2
+            # Cíl: vpravo
+            target_x = SCREEN_WIDTH + margin
+            target_y = SCREEN_HEIGHT // 2 - offset_direction * offset_percent * SCREEN_HEIGHT // 2
+        
+        # Vytvoř UFO
+        enemy = EnemyClass(x, y, target_x=target_x, target_y=target_y)
+        self.enemy_list.append(enemy)
+    
     def activate_shockwave(self):
         """Aktivuje shockwave vlnu (pouze v noci a pokud má hráč náboje)"""
         if not self.is_day and self.player.shockwave_charges > 0 and not self.shockwave_active:
             self.shockwave_active = True
             self.shockwave_timer = 0
             self.shockwave_radius_current = 0
+            self.shockwave_hit_enemies.clear()  # Reset zasažených nepřátel
             self.player.shockwave_charges -= 1
+    
+    def spawn_bonus_from_enemy(self, enemy):
+        """Vytvoř náhodný bonus pokud nepřítel má DROPS_BONUS"""
+        if getattr(enemy, 'DROPS_BONUS', False):
+            # Seznam dostupných bonusů (ty, které hráč ještě nesebral)
+            available_bonuses = []
+            
+            # Bonus bomba - vždy dostupný (lze sbírat vícekrát)
+            available_bonuses.append(("bomba", BonusBomba))
+            
+            # Bonus miny - jen pokud nebyl sebrán
+            if "miny" not in self.collected_bonus_types:
+                available_bonuses.append(("miny", BonusMiny))
+            
+            # Bonus shockwave - jen pokud nebyl sebrán
+            if "shockwave" not in self.collected_bonus_types:
+                available_bonuses.append(("shockwave", BonusShockwave))
+            
+            # Náhodně vyber bonus
+            if available_bonuses:
+                bonus_type, BonusClass = random.choice(available_bonuses)
+                bonus = BonusClass(enemy.center_x, enemy.center_y)
+                self.bonus_list.append(bonus)
+                print(f"🎁 UFO zničeno! Bonus '{bonus_type}' vytvořen na ({enemy.center_x:.0f}, {enemy.center_y:.0f})")
     
     def activate_light_bomb(self):
         """Aktivuje světelnou atomovou bombu (zničí všechny nepřátele)"""
@@ -928,6 +1058,10 @@ class Game(arcade.Window):
         
         self.mine_list.clear()
         self.enemy_list.clear()
+        self.bonus_list.clear()
+        self.collected_bonus_types.clear()  # Reset sebraných bonusů
+        self.current_max_mines = MAX_MINES  # Reset max min
+        self.current_shockwave_radius = SHOCKWAVE_RADIUS  # Reset shockwave radius
         
         # Reset spawn timerů pro každého nepřítele
         for enemy_type in ENEMY_TYPES.keys():
@@ -1280,7 +1414,7 @@ class Game(arcade.Window):
                 self.debug_shot_count += 1
                 self.update_laser_position()
         elif button == arcade.MOUSE_BUTTON_RIGHT:
-            if len(self.mine_list) < MAX_MINES:
+            if len(self.mine_list) < self.current_max_mines:
                 mine = Mine(self.player.center_x, self.player.center_y, MINE_RADIUS, MINE_CORE_RADIUS)
                 self.mine_list.append(mine)
     
@@ -1308,7 +1442,20 @@ class Game(arcade.Window):
             self.rotate_right = False
 
 
+def preload_enemy_textures():
+    """Předem načti všechny textury nepřátel, aby se hra nezasekávala při spawnu"""
+    print("Načítám textury nepřátel...")
+    for enemy_type, EnemyClass in ENEMY_TYPES.items():
+        print(f"  - {enemy_type}...")
+        # Zavolej _load_cached_animations na třídě, aby se textury načetly do cache
+        EnemyClass._load_cached_animations()
+    print("Textury načteny!")
+
+
 def main():
+    # Předem načti textury
+    preload_enemy_textures()
+    
     game = Game()
     arcade.run()
 

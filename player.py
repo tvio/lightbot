@@ -105,3 +105,120 @@ class Mine(arcade.Sprite):
                 self.core_radius,
                 arcade.color.RED
             )
+
+
+class BonusBomba(arcade.Sprite):
+    """Bonus - přidá náboj do světelné bomby"""
+    
+    BONUS_TYPE = "bomba"
+    RADIUS = 30
+    
+    def __init__(self, x: float, y: float):
+        """
+        Inicializuj bonus
+        
+        Args:
+            x, y: Pozice bonusu
+        """
+        # Načti texturu z PNG
+        try:
+            super().__init__("pict/bonus_bomba.png", center_x=x, center_y=y)
+            # Škáluj na správnou velikost
+            if self.texture.width > 0:
+                self.scale = (self.RADIUS * 2) / max(self.texture.width, self.texture.height)
+        except Exception as e:
+            print(f"CHYBA: Nelze načíst bonus_bomba.png: {e}")
+            # Fallback - žlutý kruh
+            bonus_texture = arcade.make_soft_circle_texture(
+                self.RADIUS * 2,
+                arcade.color.GOLD,
+                outer_alpha=255
+            )
+            super().__init__(bonus_texture, center_x=x, center_y=y)
+        
+        # Životnost bonusu (zmizí po 10 sekundách)
+        self.lifetime = 10.0
+    
+    def update(self, delta_time: float = 1/60):
+        """Update bonusu - životnost"""
+        self.lifetime -= delta_time
+        if self.lifetime <= 0:
+            self.remove_from_sprite_lists()
+
+
+class BonusMiny(arcade.Sprite):
+    """Bonus - zdvojnásobí maximální počet min"""
+    
+    BONUS_TYPE = "miny"
+    RADIUS = 30
+    
+    def __init__(self, x: float, y: float):
+        """
+        Inicializuj bonus
+        
+        Args:
+            x, y: Pozice bonusu
+        """
+        # Načti texturu z PNG
+        try:
+            super().__init__("pict/bonus_pocet_min.png", center_x=x, center_y=y)
+            # Škáluj na správnou velikost
+            if self.texture.width > 0:
+                self.scale = (self.RADIUS * 2) / max(self.texture.width, self.texture.height)
+        except Exception as e:
+            print(f"CHYBA: Nelze načíst bonus_pocet_min.png: {e}")
+            # Fallback - modrý kruh
+            bonus_texture = arcade.make_soft_circle_texture(
+                self.RADIUS * 2,
+                arcade.color.BLUE,
+                outer_alpha=255
+            )
+            super().__init__(bonus_texture, center_x=x, center_y=y)
+        
+        # Životnost bonusu (zmizí po 10 sekundách)
+        self.lifetime = 10.0
+    
+    def update(self, delta_time: float = 1/60):
+        """Update bonusu - životnost"""
+        self.lifetime -= delta_time
+        if self.lifetime <= 0:
+            self.remove_from_sprite_lists()
+
+
+class BonusShockwave(arcade.Sprite):
+    """Bonus - zdvojnásobí průměr shockwave"""
+    
+    BONUS_TYPE = "shockwave"
+    RADIUS = 30
+    
+    def __init__(self, x: float, y: float):
+        """
+        Inicializuj bonus
+        
+        Args:
+            x, y: Pozice bonusu
+        """
+        # Načti texturu z PNG
+        try:
+            super().__init__("pict/bonus_shockwave.png", center_x=x, center_y=y)
+            # Škáluj na správnou velikost
+            if self.texture.width > 0:
+                self.scale = (self.RADIUS * 2) / max(self.texture.width, self.texture.height)
+        except Exception as e:
+            print(f"CHYBA: Nelze načíst bonus_shockwave.png: {e}")
+            # Fallback - bílý kruh
+            bonus_texture = arcade.make_soft_circle_texture(
+                self.RADIUS * 2,
+                arcade.color.WHITE,
+                outer_alpha=255
+            )
+            super().__init__(bonus_texture, center_x=x, center_y=y)
+        
+        # Životnost bonusu (zmizí po 10 sekundách)
+        self.lifetime = 10.0
+    
+    def update(self, delta_time: float = 1/60):
+        """Update bonusu - životnost"""
+        self.lifetime -= delta_time
+        if self.lifetime <= 0:
+            self.remove_from_sprite_lists()

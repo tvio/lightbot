@@ -5,5 +5,6 @@ from .crab import Crab
 from .star import Star
 from .torpedo import Torpedo
 from .prudic import Prudic
+from .ufo import Ufo
 
-__all__ = ['Crab', 'Star', 'Torpedo', 'Prudic']
+__all__ = ['Crab', 'Star', 'Torpedo', 'Prudic', 'Ufo']
