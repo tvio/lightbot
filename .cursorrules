@@ -28,6 +28,7 @@
 - Testy: `uv run python test_*.py`
 - Hlavní hra: `uv run python main.py`
 - Nikdy nepoužívej `python` přímo, vždy `uv run python`
+- Nepouštěj hru po provedení změn, živý tester vždy ověří změnu žive sám.
 
 ## Debugging
 

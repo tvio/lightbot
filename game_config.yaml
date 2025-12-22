@@ -33,7 +33,7 @@ shockwave:
 
 # Světelná atomová bomba (ultimátní zbraň)
 light_bomb:
-  starting_count: 1 # Kolik bomb má hráč na začátku
+  starting: true # Mam na zacatku bombu?
   animation_duration: 1.0 # Jak dlouho trvá animace vlny (sekundy)
   wave_color: [255, 255, 0] # Barva vlny (zlatá)
 
@@ -117,7 +117,7 @@ enemies_config:
     movement_direction_change_time: [0, 0] # Nemění směr
     movement_type: "flythrough" # "flythrough" = letí přes obrazovku a zmizí
     max_health: 1
-    start_time: 1 # Kdy začne spawovat (sekundy od začátku hry)
+    start_time: 30 # Kdy začne spawovat (sekundy od začátku hry)
     spawn_time: 15 # Jak často se spawnuje (sekundy)
     max_count: 1 # Maximální počet na mapě
     drops_bonus: true # Při zničení nechá bonus
@@ -166,9 +166,52 @@ waves:
         count: 24
         spawn_pattern: "right"
   - name: "Prudic Wave"
-    trigger_time: 110
+    trigger_time: 45
     repeat_interval: 90
     enemies:
       - type: "prudic"
         count: 4
         spawn_pattern: "corners"
+  - name: "Star Top Wave"
+    trigger_time: 35
+    repeat_interval: 60
+    enemies:
+      - type: "star"
+        count: 20
+        spawn_pattern: "top"
+  - name: "Star Bottom Wave"
+    trigger_time: 35
+    repeat_interval: 60
+    enemies:
+      - type: "star"
+        count: 20
+        spawn_pattern: "bottom"
+  - name: "Torpedo corners wave"
+    trigger_time: 87
+    repeat_interval: 30
+    enemies:
+      - type: "torpedo"
+        count: 40
+        spawn_pattern: "corners"
+  - name: "Bomba wave"
+    trigger_time: 127
+    repeat_interval: 127
+    enemies:
+      - type: "prudic"
+        count: 4
+        spawn_pattern: "corners"
+      - type: "star"
+        count: 20
+        spawn_pattern: "left"
+      - type: "star"
+        count: 20
+        spawn_pattern: "right"
+      - type: "star"
+        count: 20
+        spawn_pattern: "top"
+      - type: "star"
+        count: 20
+        spawn_pattern: "bottom"
+      - type: "torpedo"
+        count: 20
+        spawn_pattern: "circle"
