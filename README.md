@@ -2,6 +2,8 @@
 
 Hra vytvořená pomocí Python Arcade frameworku.
 
+📖 **Příručka hry:** Viz [PRIRUCKA.md](PRIRUCKA.md) pro kompletní popis hry, nepřátel, bonusů a strategie.
+
 ## Požadavky
 
 - Python 3.13 nebo vyšší
