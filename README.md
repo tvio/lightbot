@@ -6,7 +6,7 @@ Hra vytvořená pomocí Python Arcade frameworku.
 
 ## Požadavky
 
-- Python 3.13 nebo vyšší
+- Python 3.12 nebo vyšší
 - `uv` package manager
 - Arcade 3.3.3 nebo vyšší
 - PyYAML 6.0.3 nebo vyšší
@@ -15,7 +15,7 @@ Hra vytvořená pomocí Python Arcade frameworku.
 
 ### Windows
 
-1. **Nainstaluj Python 3.13+**
+1. **Nainstaluj Python 3.12+**
    - Stáhni z [python.org](https://www.python.org/downloads/)
    - Při instalaci zaškrtni "Add Python to PATH"
 
@@ -46,14 +46,14 @@ Hra vytvořená pomocí Python Arcade frameworku.
 
 ### Linux
 
-1. **Nainstaluj Python 3.13+**
+1. **Nainstaluj Python 3.12+**
    ```bash
    # Ubuntu/Debian
    sudo apt update
-   sudo apt install python3.13 python3.13-venv python3-pip
+   sudo apt install python3.12 python3.12-venv python3-pip
    
    # Fedora
-   sudo dnf install python3.13 python3-pip
+   sudo dnf install python3.12 python3-pip
    
    # Arch Linux
    sudo pacman -S python python-pip
@@ -70,7 +70,7 @@ Hra vytvořená pomocí Python Arcade frameworku.
 
 3. **Naklonuj nebo stáhni projekt**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/tvio/lightbot
    cd lightbot
    ```
 
@@ -86,10 +86,10 @@ Hra vytvořená pomocí Python Arcade frameworku.
 
 ### macOS
 
-1. **Nainstaluj Python 3.13+**
+1. **Nainstaluj Python 3.12+**
    ```bash
    # Pomocí Homebrew (doporučeno)
-   brew install python@3.13
+   brew install python@3.12
    
    # Nebo stáhni z python.org
    ```

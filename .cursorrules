@@ -4,7 +4,7 @@
 
 - Projekt používá **uv** jako package manager
 - Vždy používej `uv run python` místo `python` pro spouštění skriptů
-- Python verze: 3.13
+- Python verze: 3.12
 - Framework: Arcade 3.x
 
 ## Struktura projektu
