@@ -10,10 +10,12 @@ import yaml
 import random
 import os
 import glob
+import time
 from typing import Tuple, Optional
 
 # Import modulů
 from player import Player, Mine, GuidedMine, BonusBomba, BonusMiny, BonusShockwave, BonusExtraZivot, BonusKanon, BonusNavadeneMiny
+from menu import GameMenu
 from infrastruktura import find_laser_collision_with_enemies, calculate_laser_end
 from enemies.base_enemy import BaseEnemy
 from enemies import Crab, Star, Torpedo, Prudic, Ufo
@@ -264,6 +266,9 @@ class Game(arcade.Window):
         self.fps_display = 0
         self.fps_timer = 0
         
+        # Menu systém
+        self.menu = GameMenu(SCREEN_WIDTH, SCREEN_HEIGHT)
+        
         # Hudba
         self.music_files = MUSIC_FILES
         # Vyber náhodnou píseň pro start, pak pokračuj v abecedním pořadí
@@ -273,9 +278,13 @@ class Game(arcade.Window):
         self.song_name_display_duration = 3.0  # 3 sekundy
         self.current_music_player = None  # Aktuální přehrávač hudby
         
+        # Ovládání hudby - detekce dvojitého stisku E
+        self.last_e_press_time = 0
+        self.double_press_threshold = 0.4  # 400ms pro dvojité stisknutí
+        
         # Spusť první píseň (náhodně vybranou)
         if self.music_files:
-            self.play_next_song()
+            self.play_song_at_index(self.current_music_index)
     
     def on_draw(self):
         """Vykreslení na obrazovku"""
@@ -428,12 +437,33 @@ class Game(arcade.Window):
         # Vykresli stav bonusů (nahoře vlevo pod světelnou bombou)
         self.draw_bonus_status()
         
-        # Zobraz FPS
-        if not hasattr(self, 'fps_text'):
-            self.fps_text = arcade.Text("", 10, SCREEN_HEIGHT - 30, arcade.color.WHITE, 16)
+        # Zobraz "F1 menu" vlevo nahoře
+        arcade.draw_text(
+            "F1 menu",
+            10,
+            SCREEN_HEIGHT - 30,
+            (150, 150, 150),
+            16,
+            anchor_x="left",
+            anchor_y="center"
+        )
+        
+        # Zobraz FPS vpravo pod časem
         fps = arcade.get_fps()
-        self.fps_text.text = f"FPS: {fps:.1f}"
-        self.fps_text.draw()
+        fps_text_x = SCREEN_WIDTH - 200
+        fps_text_y = SCREEN_HEIGHT - 90  # Pod časem (čas je na -65)
+        arcade.draw_text(
+            f"FPS: {fps:.1f}",
+            fps_text_x,
+            fps_text_y,
+            (100, 100, 100),
+            14,
+            anchor_x="left",
+            anchor_y="center"
+        )
+        
+        # Vykresli menu (pokud je viditelné)
+        self.menu.draw()
     
     def draw_cannon_bar(self):
         """Vykreslí progress bar pro dobití děla (den)"""
@@ -778,6 +808,12 @@ class Game(arcade.Window):
     
     def on_update(self, delta_time):
         """Update logiky hry"""
+        # Pokud je menu otevřené, zastavíme game loop
+        if self.menu.visible:
+            # Pouze aktualizuj hudbu (aby hrála i v menu)
+            self.update_music(delta_time)
+            return
+        
         # Update hráče
         if self.player.game_over:
             self.player.explode_timer -= delta_time
@@ -1390,6 +1426,11 @@ class Game(arcade.Window):
     
     def on_mouse_motion(self, x, y, dx, dy):
         """Pohyb myši"""
+        # V menu aktualizuj výběr podle pozice myši
+        if self.menu.visible:
+            self.menu.select_by_mouse(x, y)
+            return
+        
         if not self.player.game_over and not self.respawn_bomb_active:
             self.player.center_x = x
             self.player.center_y = y
@@ -1715,18 +1756,20 @@ class Game(arcade.Window):
                 
                 self.enemy_list.append(enemy)
     
-    def play_next_song(self):
-        """Přehraj další píseň v seznamu (cyklicky)"""
+    def play_song_at_index(self, index: int):
+        """Přehraj píseň na daném indexu"""
         if not self.music_files:
             return
         
         # Zastav předchozí píseň, pokud hraje
         if self.current_music_player:
-            # V Arcade používáme delete() pro zastavení a uvolnění playeru
             self.current_music_player.delete()
             self.current_music_player = None
         
-        # Načti aktuální píseň
+        # Nastav index (s wrap around)
+        self.current_music_index = index % len(self.music_files)
+        
+        # Načti píseň
         current_file = self.music_files[self.current_music_index]
         
         # Extrahuj název (bez .mp3)
@@ -1736,14 +1779,30 @@ class Game(arcade.Window):
         self.song_name_display_timer = self.song_name_display_duration
         
         # Přehraj píseň pomocí Arcade
-        # streaming=True pro velké hudební soubory (nenahrává celý soubor do paměti)
         music_sound = arcade.load_sound(current_file, streaming=True)
         self.current_music_player = music_sound.play(volume=0.5)
         
         print(f"♪ Přehrávám: {self.current_song_name}")
-        
-        # Přejdi na další píseň (cyklicky)
-        self.current_music_index = (self.current_music_index + 1) % len(self.music_files)
+    
+    def play_next_song(self):
+        """Přehraj další píseň v seznamu (cyklicky) - klávesa W"""
+        if not self.music_files:
+            return
+        next_index = (self.current_music_index + 1) % len(self.music_files)
+        self.play_song_at_index(next_index)
+    
+    def play_previous_song(self):
+        """Přehraj předchozí píseň v seznamu (cyklicky) - dvojité E"""
+        if not self.music_files:
+            return
+        prev_index = (self.current_music_index - 1) % len(self.music_files)
+        self.play_song_at_index(prev_index)
+    
+    def restart_current_song(self):
+        """Restartuj aktuální píseň od začátku - klávesa E"""
+        if not self.music_files:
+            return
+        self.play_song_at_index(self.current_music_index)
     
     def update_music(self, delta_time):
         """Aktualizuj hudbu - kontrola konce písně"""
@@ -1768,6 +1827,15 @@ class Game(arcade.Window):
     
     def on_mouse_press(self, x, y, button, modifiers):
         """Kliknutí myši"""
+        # V menu - kliknutí aktivuje vybranou položku
+        if self.menu.visible:
+            if button == arcade.MOUSE_BUTTON_LEFT:
+                # Nejdřív aktualizuj výběr podle pozice
+                if self.menu.select_by_mouse(x, y):
+                    result = self.menu.activate_selected()
+                    self._process_menu_action(result)
+            return
+        
         if self.player.game_over:
             return
         
@@ -1798,6 +1866,36 @@ class Game(arcade.Window):
     
     def on_key_press(self, key, modifiers):
         """Stisknutí klávesy"""
+        # F1 - otevření/zavření menu
+        if key == arcade.key.F1:
+            self.menu.toggle()
+            # Zobraz/schovej kurzor myši podle stavu menu
+            self.set_mouse_visible(self.menu.visible)
+            return
+        
+        # Ovládání hudby - funguje vždy (i v menu a game over)
+        if key == arcade.key.W:
+            # W = další písnička
+            self.play_next_song()
+            return
+        elif key == arcade.key.E:
+            # E = restart aktuální / EE = předchozí písnička
+            current_time = time.time()
+            if current_time - self.last_e_press_time < self.double_press_threshold:
+                # Dvojité stisknutí - předchozí písnička
+                self.play_previous_song()
+                self.last_e_press_time = 0  # Reset pro další detekci
+            else:
+                # Jednoduché stisknutí - restart aktuální
+                self.restart_current_song()
+                self.last_e_press_time = current_time
+            return
+        
+        # Pokud je menu otevřené, zpracuj klávesy pro menu
+        if self.menu.visible:
+            self._handle_menu_keys(key)
+            return
+        
         if self.player.game_over:
             return
         
@@ -1809,8 +1907,71 @@ class Game(arcade.Window):
             # Světelná atomová bomba (Q pro levou ruku, Enter pro pravou)
             self.activate_light_bomb()
     
+    def _handle_menu_keys(self, key):
+        """Zpracování kláves v menu"""
+        # ESC - zavření menu
+        if key == arcade.key.ESCAPE:
+            self.menu.hide()
+            self.set_mouse_visible(False)
+            return
+        
+        # Šipky nahoru/dolů - navigace
+        if key == arcade.key.UP:
+            self.menu.move_selection(-1)
+        elif key == arcade.key.DOWN:
+            self.menu.move_selection(1)
+        
+        # Enter - aktivace vybrané položky
+        elif key == arcade.key.ENTER:
+            result = self.menu.activate_selected()
+            self._process_menu_action(result)
+        
+        # Čísla 1-6 - přímý výběr položky
+        elif key == arcade.key.KEY_1:
+            result = self.menu.select_by_number(1)
+            self._process_menu_action(result)
+        elif key == arcade.key.KEY_2:
+            result = self.menu.select_by_number(2)
+            self._process_menu_action(result)
+        elif key == arcade.key.KEY_3:
+            result = self.menu.select_by_number(3)
+            self._process_menu_action(result)
+        elif key == arcade.key.KEY_4:
+            result = self.menu.select_by_number(4)
+            self._process_menu_action(result)
+        elif key == arcade.key.KEY_5:
+            result = self.menu.select_by_number(5)
+            self._process_menu_action(result)
+        elif key == arcade.key.KEY_6:
+            result = self.menu.select_by_number(6)
+            self._process_menu_action(result)
+    
+    def _process_menu_action(self, result: Optional[str]):
+        """Zpracování akce z menu"""
+        if result is None:
+            return
+        
+        # Konec hry
+        if result == "action_Konec hry":
+            arcade.close_window()
+        
+        # Zde budou další akce podle potřeby
+        # Pro submenu zatím jen debug výpis
+        if result.startswith("submenu_"):
+            submenu_name = result.replace("submenu_", "")
+            print(f"📋 Submenu '{submenu_name}' - zatím neimplementováno")
+        
+        # Toggle obtížnosti
+        if result == "toggle_Obtížnost":
+            difficulty = self.menu.items[0].value
+            print(f"🎮 Obtížnost změněna na: {difficulty}")
+    
     def on_key_release(self, key, modifiers):
         """Uvolnění klávesy"""
+        # V menu nereagujeme na uvolnění kláves
+        if self.menu.visible:
+            return
+        
         if self.player.game_over:
             return
         
