@@ -52,6 +52,11 @@ mines:
   blink_speed: 1
   max_count: 10
 
+# Obtížnost
+difficulty:
+  normal: 1.0
+  pro_deti: 0.2
+
 # Nepřátelé - generální nastavení
 enemies:
   spawn_time: 1 # Jak často se spawn (sekundy)

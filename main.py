@@ -45,6 +45,7 @@ if CONFIG is None:
         'laser': {'duration': 0.1, 'recharge_time': 3.0},
         'day_night': {'day_length': 30.0, 'night_length': 30.0},
         'mines': {'max_count': 15},
+        'difficulty': {'normal': 1.0, 'pro_deti': 0.5},
     }
 
 # Extrahuj hodnoty z configu
@@ -98,6 +99,13 @@ ENEMY_CONFIG = CONFIG['enemies_config']
 
 # Wave konfigurace
 WAVES_CONFIG = CONFIG.get('waves', [])
+
+# Škály obtížnosti (načteno z configu)
+DIFFICULTY_CONFIG = CONFIG.get('difficulty', {})
+DIFFICULTY_SCALES = {
+    "normal": DIFFICULTY_CONFIG.get('normal', 1.0),
+    "pro děti": DIFFICULTY_CONFIG.get('pro_deti', 0.5),
+}
 
 # Nastav screen dimensions pro BaseEnemy (pro wraparound)
 BaseEnemy.SCREEN_WIDTH = SCREEN_WIDTH
@@ -163,6 +171,10 @@ class Game(arcade.Window):
         
         # Schovej kurzor myši
         self.set_mouse_visible(False)
+        
+        # Obtížnost (škála: 1.0 = normal, 0.5 = pro děti)
+        self.difficulty_name = "normal"
+        self.difficulty_scale = DIFFICULTY_SCALES[self.difficulty_name]
         
         # Skóre
         self.score = 0
@@ -479,7 +491,7 @@ class Game(arcade.Window):
         bar_fill_color = arcade.color.WHITE
         
         text_label = "Světelné dělo:"
-        text_x = bar_x - bar_width // 2 - 120
+        text_x = bar_x - bar_width // 2 - 150
         text_y = bar_y
         
         arcade.draw_text(
@@ -519,7 +531,7 @@ class Game(arcade.Window):
     
     def draw_battery_bar(self):
         """Vykreslí banner baterie pro shockwave (noc)"""
-        bar_x = SCREEN_WIDTH // 2
+        bar_x = SCREEN_WIDTH // 2  
         bar_y = SCREEN_HEIGHT - 40
         bar_width = 300
         bar_height = 20
@@ -531,7 +543,7 @@ class Game(arcade.Window):
         bar_fill_color = arcade.color.WHITE
         
         text_label = "Baterie (vln):"
-        text_x = bar_x - bar_width // 2 - 120
+        text_x = bar_x - bar_width // 2 - 150
         text_y = bar_y
         
         arcade.draw_text(
@@ -547,7 +559,7 @@ class Game(arcade.Window):
         bar_bottom = bar_y - bar_height // 2
         bar_top = bar_y + bar_height // 2
         
-        border_width = 2
+        border_width = 2 
         arcade.draw_lbwh_rectangle_outline(
             bar_left,
             bar_bottom,
@@ -1009,10 +1021,12 @@ class Game(arcade.Window):
             if enemy_type == "ufo" and self.has_all_bonuses():
                 continue
             
-            # Kontrola maximálního počtu
+            # Kontrola maximálního počtu (upraveno podle obtížnosti)
             current_count = sum(1 for enemy in self.enemy_list 
                               if enemy.ENEMY_TYPE_NAME == enemy_type)
-            if current_count >= enemy_config['max_count']:
+            # Škálování max_count podle obtížnosti, zaokrouhleno nahoru (min 1)
+            scaled_max_count = max(1, math.ceil(enemy_config['max_count'] * self.difficulty_scale))
+            if current_count >= scaled_max_count:
                 continue
             
             # Aktualizuj spawn timer
@@ -1472,7 +1486,9 @@ class Game(arcade.Window):
         
         for enemy_config in wave['enemies']:
             enemy_type = enemy_config['type']
-            count = enemy_config['count']
+            # Škálování počtu nepřátel podle obtížnosti, zaokrouhleno nahoru (min 1)
+            base_count = enemy_config['count']
+            count = max(1, math.ceil(base_count * self.difficulty_scale))
             pattern = enemy_config['spawn_pattern']
             
             # Spawn podle pattern
@@ -1963,8 +1979,9 @@ class Game(arcade.Window):
         
         # Toggle obtížnosti
         if result == "toggle_Obtížnost":
-            difficulty = self.menu.items[0].value
-            print(f"🎮 Obtížnost změněna na: {difficulty}")
+            self.difficulty_name = self.menu.items[0].value
+            self.difficulty_scale = DIFFICULTY_SCALES.get(self.difficulty_name, 1.0)
+            print(f"🎮 Obtížnost změněna na: {self.difficulty_name} (škála: {self.difficulty_scale})")
     
     def on_key_release(self, key, modifiers):
         """Uvolnění klávesy"""
